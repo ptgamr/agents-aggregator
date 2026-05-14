@@ -7,13 +7,15 @@ interface DiffViewProps {
   newText: string;
   /** Cap rendered lines so a 5000-line refactor doesn't blow up the entry block. */
   maxLines?: number;
+  /** Override the default 320px scroll viewport (e.g. for the focused modal). */
+  maxHeight?: number | string;
 }
 
 /**
  * Unified line-level diff. Removed lines render with a red tint and "-" prefix;
  * added lines green with "+". Context lines are dim.
  */
-export function DiffView({ theme, oldText, newText, maxLines = 200 }: DiffViewProps) {
+export function DiffView({ theme, oldText, newText, maxLines = 200, maxHeight = 320 }: DiffViewProps) {
   const t = themes[theme];
   const isDark = theme === 'dark';
   const parts = diffLines(oldText, newText);
@@ -38,7 +40,7 @@ export function DiffView({ theme, oldText, newText, maxLines = 200 }: DiffViewPr
     <pre style={{
       margin: 0, padding: '8px 0', fontFamily: monoFont, fontSize: 12.5,
       background: isDark ? '#0a0c10' : '#fffdf7',
-      overflow: 'auto', maxHeight: 320, lineHeight: 1.45,
+      overflow: 'auto', maxHeight, lineHeight: 1.45,
     }}>
       {shown.map((r, i) => (
         <div key={i} style={{

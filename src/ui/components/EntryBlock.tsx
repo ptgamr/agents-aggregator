@@ -2,6 +2,7 @@ import type { CSSProperties, ReactNode } from 'react';
 import type { Entry, EntryImage, Session } from '../../shared/types';
 import { LivePip } from './AgentChip';
 import { DiffView } from './DiffView';
+import { previewFromArgs, useFilePreview } from './FilePreview';
 import { Markdown } from './Markdown';
 import { useLightbox, type LightboxImage } from './Lightbox';
 import {
@@ -23,6 +24,7 @@ interface EntryBlockProps {
 
 export function EntryBlock({ entry: e, theme, session, compact, isNew, selected, onSelect }: EntryBlockProps) {
   const t = themes[theme];
+  const { open: openPreview } = useFilePreview();
   const isUser = e.role === 'user';
   const isThinking = e.role === 'thinking';
   const isTool = e.role === 'toolCall';
@@ -63,6 +65,12 @@ export function EntryBlock({ entry: e, theme, session, compact, isNew, selected,
 
   if (isTool) {
     const body = renderToolBody(e, theme, t);
+    const preview = previewFromArgs(e.tool, e.args as Record<string, unknown> | undefined);
+    const path = e.args?.path;
+    const expand = (ev: { stopPropagation: () => void }) => {
+      ev.stopPropagation();
+      if (preview) openPreview(preview);
+    };
     return (
       <div onClick={onSelect} style={{
         ...baseStyle, border: `1px solid ${selected ? t.accent : t.border}`,
@@ -76,10 +84,37 @@ export function EntryBlock({ entry: e, theme, session, compact, isNew, selected,
         }}>
           <span style={{ color: t.accent }}>▸</span>
           <span style={{ color: t.fg, fontWeight: 500 }}>{e.tool}</span>
-          <span style={{
-            flex: 1, minWidth: 0,
-            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-          }}>{e.args?.path}</span>
+          {path ? (
+            <span
+              onClick={preview ? expand : undefined}
+              title={preview ? `Open ${path}` : path}
+              style={{
+                flex: 1, minWidth: 0,
+                overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                cursor: preview ? 'pointer' : 'default',
+                textDecoration: preview ? 'underline' : 'none',
+                textDecorationColor: t.dim2,
+                textUnderlineOffset: 2,
+                color: preview ? t.fg2 : t.dim,
+              }}
+            >{path}</span>
+          ) : (
+            <span style={{ flex: 1, minWidth: 0 }} />
+          )}
+          {preview && (
+            <button
+              type="button"
+              onClick={expand}
+              aria-label="Open full diff"
+              title="Open full diff"
+              style={{
+                background: 'transparent', color: t.dim,
+                border: `1px solid ${t.border}`, borderRadius: 4,
+                padding: '2px 6px', fontSize: 11, lineHeight: 1, cursor: 'pointer',
+                fontFamily: monoFont,
+              }}
+            >⤢</button>
+          )}
           <span style={{ color: t.dim2 }}>{e.timestamp}</span>
         </div>
         {body}

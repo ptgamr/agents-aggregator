@@ -21,6 +21,7 @@ import { SessionList } from './components/SessionList';
 import { SessionDetail } from './components/SessionDetail';
 import { InspectorRail } from './components/InspectorRail';
 import { LightboxProvider } from './components/Lightbox';
+import { FilePreviewProvider } from './components/FilePreview';
 import {
   TweakRadio,
   TweakSection,
@@ -141,6 +142,7 @@ export function AppShell() {
 
   return (
     <LightboxProvider>
+    <FilePreviewProvider theme={tw.theme}>
     <div style={{
       width: '100%', height: '100%', background: t.bg, color: t.fg,
       fontFamily: sansFont, fontSize: 14, display: 'flex', flexDirection: 'column',
@@ -251,6 +253,7 @@ export function AppShell() {
                      onChange={(v) => setTw('liveLoud', v)} />
       </TweaksPanel>
     </div>
+    </FilePreviewProvider>
     </LightboxProvider>
   );
 }
