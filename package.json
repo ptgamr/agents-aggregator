@@ -1,13 +1,28 @@
 {
   "name": "agents-aggregator",
   "version": "0.1.0",
-  "private": true,
+  "private": false,
   "type": "module",
+  "bin": {
+    "agents-agg": "dist/server/cli.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "dev": "concurrently -n srv,ui -c blue,magenta \"npm:dev:server\" \"npm:dev:ui\"",
-    "dev:server": "tsx watch src/server/index.ts",
+    "dev:server": "tsx watch src/server/cli.ts serve",
     "dev:ui": "vite",
-    "build": "tsc -b && vite build",
+    "typecheck": "tsc -b",
+    "build:server": "esbuild src/server/cli.ts --bundle --platform=node --format=esm --target=node18 --outfile=dist/server/cli.js --banner:js='#!/usr/bin/env node\nimport { createRequire as __cr } from \"module\"; const require = __cr(import.meta.url);' --packages=external && chmod +x dist/server/cli.js",
+    "build:ui": "vite build",
+    "build": "npm run build:ui && npm run build:server",
+    "prepare": "npm run build",
     "preview": "vite preview",
     "cli": "tsx src/server/cli.ts"
   },
@@ -35,6 +50,7 @@
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.4",
     "concurrently": "^9.1.0",
+    "esbuild": "^0.24.2",
     "tsx": "^4.19.2",
     "typescript": "^5.6.3",
     "vite": "^5.4.11"

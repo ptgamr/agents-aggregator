@@ -101,10 +101,10 @@ alias claude-two="CLAUDE_CONFIG_DIR=~/.claude-two claude"
 Then add each directory as a source:
 
 ```bash
-npm run cli -- source add ~/.claude-one --label "Claude (personal)"
-npm run cli -- source add ~/.claude-two --label "Claude (work)"
-npm run cli -- source add ~/.codex-one  --label "Codex (personal)"
-npm run cli -- source add ~/.codex-two  --label "Codex (work)"
+agents-agg source add ~/.claude-one --label "Claude (personal)"
+agents-agg source add ~/.claude-two --label "Claude (work)"
+agents-agg source add ~/.codex-one  --label "Codex (personal)"
+agents-agg source add ~/.codex-two  --label "Codex (work)"
 ```
 
 ## Requirements
@@ -115,25 +115,36 @@ npm run cli -- source add ~/.codex-two  --label "Codex (work)"
 
 ## Install and run
 
+### Run directly from GitHub (no clone)
+
 ```bash
-git clone https://github.com/<your-org>/agents-aggregator.git
+npx github:ptgamr/agents-aggregator source add ~/.claude
+npx github:ptgamr/agents-aggregator source add ~/.codex
+npx github:ptgamr/agents-aggregator serve
+```
+
+Open <http://localhost:3000>.
+
+The first `npx` invocation clones the repo into npm's cache and runs the
+build (~10s). Subsequent invocations are instant. Add `--config /path/to/config.json`
+to use a custom config location (the SQLite index lives next to it).
+
+You can also install it once:
+
+```bash
+npm install -g github:ptgamr/agents-aggregator
+agents-agg source add ~/.claude
+agents-agg serve
+```
+
+### Develop locally
+
+```bash
+git clone https://github.com/ptgamr/agents-aggregator.git
 cd agents-aggregator
 npm install
-```
-
-Add at least one source folder:
-
-```bash
 npm run cli -- source add ~/.claude
-npm run cli -- source add ~/.codex
-npm run cli -- source add ~/.local/share/opencode
-npm run cli -- source add ~/.pi
-```
-
-Start the dev server (Hono API on `:3000`, Vite UI on `:5173`):
-
-```bash
-npm run dev
+npm run dev   # Hono API on :3000, Vite UI on :5173
 ```
 
 Open <http://localhost:5173>.
@@ -163,16 +174,22 @@ You can hand-edit this file or manage it via the CLI.
 ## CLI
 
 ```bash
-npm run cli -- source add <root> [--label <label>] [--agent <agent>] [--id <id>]
-npm run cli -- source list
-npm run cli -- source remove <id>
-npm run cli -- source enable <id>
-npm run cli -- source disable <id>
-npm run cli -- scan          # re-index all enabled sources
+agents-agg [--config <path>] serve [--port <n>] [--no-ui]
+agents-agg [--config <path>] source add <root> [--label <label>] [--agent <agent>] [--id <id>]
+agents-agg [--config <path>] source list
+agents-agg [--config <path>] source remove <id>
+agents-agg [--config <path>] source enable <id>
+agents-agg [--config <path>] source disable <id>
+agents-agg [--config <path>] scan          # re-index all enabled sources
 ```
 
 `<agent>` is one of `claude`, `codex`, `opencode`, `pi`. Omit it to auto-detect
-from the folder layout.
+from the folder layout. `--config` accepts a path to a `config.json`; the SQLite
+index is created alongside it. If omitted, the default
+`~/.config/agents-aggregator/config.json` is used.
+
+During local development you can replace `agents-agg` with
+`npm run cli --` to run the TypeScript sources directly via `tsx`.
 
 
 ## Architecture

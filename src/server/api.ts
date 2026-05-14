@@ -1,7 +1,10 @@
 import fs from 'node:fs/promises';
+import { createReadStream, existsSync, statSync } from 'node:fs';
 import path from 'node:path';
 import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
+import { getMimeType } from 'hono/utils/mime';
+import { Readable } from 'node:stream';
 import { sessionsRepo, sourcesRepo, summariesRepo } from './db';
 import { parserFor } from './parsers';
 import { subscribe } from './pubsub';
@@ -278,3 +281,36 @@ app.get('/api/events', (c) => {
     }
   });
 });
+
+// Serve the built UI as the SPA fallback. Mounted last so it only catches
+// requests that didn't hit an /api route above.
+export function mountStaticUi(uiDir: string): void {
+  if (!existsSync(uiDir)) {
+    log.warn({ uiDir }, 'UI directory not found — UI will not be served');
+    return;
+  }
+  const indexFile = path.join(uiDir, 'index.html');
+
+  app.get('*', async (c) => {
+    let reqPath = decodeURI(new URL(c.req.url).pathname);
+    if (reqPath.includes('..')) return c.notFound();
+
+    let filePath = path.join(uiDir, reqPath);
+    let stat = safeStat(filePath);
+    if (!stat || stat.isDirectory()) {
+      // SPA fallback — serve index.html for any non-asset path
+      filePath = indexFile;
+      stat = safeStat(filePath);
+      if (!stat) return c.notFound();
+    }
+
+    const mime = getMimeType(filePath) ?? 'application/octet-stream';
+    c.header('Content-Type', mime);
+    c.header('Content-Length', String(stat.size));
+    return c.body(Readable.toWeb(createReadStream(filePath)) as ReadableStream);
+  });
+}
+
+function safeStat(p: string) {
+  try { return statSync(p); } catch { return null; }
+}
