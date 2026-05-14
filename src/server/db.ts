@@ -159,7 +159,7 @@ export const sessionsRepo = {
     if (opts.agent) { where.push('agent = @agent'); params.agent = opts.agent; }
     if (opts.project) { where.push('cwd = @project'); params.project = opts.project; }
     if (opts.q) {
-      where.push('(COALESCE(name,"") LIKE @q OR COALESCE(cwd,"") LIKE @q OR COALESCE(model,"") LIKE @q)');
+      where.push("(COALESCE(name,'') LIKE @q OR COALESCE(cwd,'') LIKE @q OR COALESCE(model,'') LIKE @q)");
       params.q = `%${opts.q}%`;
     }
     const sql = `SELECT * FROM session ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
@@ -171,7 +171,7 @@ export const sessionsRepo = {
     const params: Record<string, unknown> = {};
     if (opts.sourceId) { where.push('sourceId = @sourceId'); params.sourceId = opts.sourceId; }
     if (opts.q) {
-      where.push('(COALESCE(name,"") LIKE @q OR COALESCE(cwd,"") LIKE @q OR COALESCE(model,"") LIKE @q)');
+      where.push("(COALESCE(name,'') LIKE @q OR COALESCE(cwd,'') LIKE @q OR COALESCE(model,'') LIKE @q)");
       params.q = `%${opts.q}%`;
     }
     return getDb()
@@ -189,7 +189,7 @@ export const sessionsRepo = {
     const params: Record<string, unknown> = {};
     if (opts.project) { where.push('cwd = @project'); params.project = opts.project; }
     if (opts.q) {
-      where.push('(COALESCE(name,"") LIKE @q OR COALESCE(cwd,"") LIKE @q OR COALESCE(model,"") LIKE @q)');
+      where.push("(COALESCE(name,'') LIKE @q OR COALESCE(cwd,'') LIKE @q OR COALESCE(model,'') LIKE @q)");
       params.q = `%${opts.q}%`;
     }
     const rows = getDb()
