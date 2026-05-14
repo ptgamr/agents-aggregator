@@ -19,6 +19,8 @@ Runs entirely on your machine. No cloud, no auth, single process.
 
 ![Agents Aggregator screenshot](./screenshot.png)
 
+Or Watch me building it in realtime: https://www.youtube.com/watch?v=ACWjW-3LFS0
+
 ## Supported agents
 
 | Agent       | Folder layout                                                 |
