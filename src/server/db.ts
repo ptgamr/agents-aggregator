@@ -239,6 +239,13 @@ export const summariesRepo = {
       .get(sourceId, sessionId, backend);
     return r ?? null;
   },
+  listForSession(sourceId: string, sessionId: string): SummaryRow[] {
+    return getDb()
+      .prepare<unknown[], SummaryRow>(
+        `SELECT * FROM summary WHERE sourceId = ? AND sessionId = ?`,
+      )
+      .all(sourceId, sessionId);
+  },
   upsert(row: SummaryRow): void {
     getDb()
       .prepare(

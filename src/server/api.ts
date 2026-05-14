@@ -156,6 +156,22 @@ app.post('/api/sessions/:sourceId/:sessionId/input', async (c) => {
   return c.json({ ok: true, target: resolved.target });
 });
 
+app.get('/api/sessions/:sourceId/:sessionId/summary/status', (c) => {
+  const sourceId = c.req.param('sourceId');
+  const sessionId = c.req.param('sessionId');
+  const session = sessionsRepo.find(sourceId, sessionId);
+  if (!session) return c.json({ error: 'session not found' }, 404);
+  const rows = summariesRepo.listForSession(sourceId, sessionId);
+  // Returns the cached text so the UI can render it without triggering
+  // generation. Regenerate is the only path that hits the LLM.
+  const summaries = rows.map((r) => ({
+    backend: r.backend,
+    text: r.text,
+    createdAt: r.createdAt,
+  }));
+  return c.json({ summaries });
+});
+
 app.get('/api/sessions/:sourceId/:sessionId/summary', async (c) => {
   const sourceId = c.req.param('sourceId');
   const sessionId = c.req.param('sessionId');

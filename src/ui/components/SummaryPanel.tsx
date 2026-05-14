@@ -14,20 +14,38 @@ interface SummaryMeta {
   stale?: boolean;
 }
 
+/** Hydrated from a cached summary row so the panel can render without
+ *  triggering a generation pass. */
+export interface PreloadedSummary {
+  backend: Backend;
+  text: string;
+  createdAt: string;
+}
+
 interface SummaryPanelProps {
   theme: ThemeMode;
   sessionId: string;
   onClose?: () => void;
+  /** If provided, the panel mounts populated from this cached row instead of
+   *  the idle "pick a backend" state. No network call is made — generation
+   *  still requires the user to click Claude / Codex / Regenerate. */
+  preloaded?: PreloadedSummary;
+  /** Called once a fresh (non-cached) summary has finished generating. */
+  onGenerated?: () => void;
 }
 
-export function SummaryPanel({ theme, sessionId, onClose }: SummaryPanelProps) {
+export function SummaryPanel({ theme, sessionId, onClose, preloaded, onGenerated }: SummaryPanelProps) {
   const t = themes[theme];
-  const [backend, setBackend] = useState<Backend | null>(null);
-  const [status, setStatus] = useState<Status>('idle');
-  const [text, setText] = useState<string>('');
-  const [meta, setMeta] = useState<SummaryMeta | null>(null);
+  const [backend, setBackend] = useState<Backend | null>(preloaded?.backend ?? null);
+  const [status, setStatus] = useState<Status>(preloaded ? 'done' : 'idle');
+  const [text, setText] = useState<string>(preloaded?.text ?? '');
+  const [meta, setMeta] = useState<SummaryMeta | null>(
+    preloaded ? { cached: true, createdAt: preloaded.createdAt } : null,
+  );
   const [errorDetail, setErrorDetail] = useState<string>('');
   const esRef = useRef<EventSource | null>(null);
+  const onGeneratedRef = useRef(onGenerated);
+  onGeneratedRef.current = onGenerated;
 
   // Cancel any in-flight stream on unmount or restart.
   useEffect(() => () => { esRef.current?.close(); }, []);
@@ -52,8 +70,13 @@ export function SummaryPanel({ theme, sessionId, onClose }: SummaryPanelProps) {
     const es = new EventSource(url);
     esRef.current = es;
 
+    let wasFresh = false;
     es.addEventListener('meta', (ev) => {
-      try { setMeta(JSON.parse((ev as MessageEvent).data) as SummaryMeta); } catch { /* ignore */ }
+      try {
+        const m = JSON.parse((ev as MessageEvent).data) as SummaryMeta;
+        if (m.cached === false) wasFresh = true;
+        setMeta(m);
+      } catch { /* ignore */ }
     });
     es.addEventListener('status', () => { /* not surfaced for now */ });
     es.addEventListener('stale', (ev) => {
@@ -76,7 +99,11 @@ export function SummaryPanel({ theme, sessionId, onClose }: SummaryPanelProps) {
         }
       } catch { /* ignore */ }
     });
-    es.addEventListener('done', () => { setStatus('done'); es.close(); });
+    es.addEventListener('done', () => {
+      setStatus('done');
+      es.close();
+      if (wasFresh) onGeneratedRef.current?.();
+    });
     es.addEventListener('error', (ev) => {
       try {
         const data = JSON.parse((ev as MessageEvent).data) as { detail?: string };
@@ -103,7 +130,10 @@ export function SummaryPanel({ theme, sessionId, onClose }: SummaryPanelProps) {
       return `${backend} • streaming…`;
     }
     // done
-    if (meta?.cached) return `${backend} • cached${meta.createdAt ? ` ${formatAge(meta.createdAt)}` : ''}`;
+    if (meta?.cached) {
+      const age = meta.createdAt ? ` ${formatAge(meta.createdAt)}` : '';
+      return `${backend} • cached${age}`;
+    }
     if (meta?.entryCount != null && meta.distilledChars != null) {
       return `${backend} • done • ${meta.entryCount} entries → ${meta.distilledChars.toLocaleString()} chars`;
     }

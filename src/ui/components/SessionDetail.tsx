@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Entry, Session, Source } from '../../shared/types';
 import type { BlurredProjects } from '../hooks/useBlurredProjects';
-import { sendSessionInput } from '../api';
+import { sendSessionInput, useSummaryStatus } from '../api';
 import { lastPathSegment, relativeTime } from '../format';
 import { AgentChip, LivePip } from './AgentChip';
 import { EntryBlock } from './EntryBlock';
@@ -44,6 +44,16 @@ export function SessionDetail({
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const lastCountRef = useRef<number>(entries.length);
   const [mode, setMode] = useState<ViewMode>('chat');
+  const [summaryRefresh, setSummaryRefresh] = useState<number>(0);
+  const { data: summaryStatus } = useSummaryStatus(session?.id, summaryRefresh);
+  const cached = summaryStatus[0];
+  const preloadedSummary = cached
+    ? {
+        backend: (cached.backend === 'codex' ? 'codex' : 'claude') as 'claude' | 'codex',
+        text: cached.text,
+        createdAt: cached.createdAt,
+      }
+    : undefined;
 
   useEffect(() => {
     // Don't auto-scroll to bottom on new entries in reader mode — the summary
@@ -142,7 +152,19 @@ export function SessionDetail({
         <div style={innerWrapStyle}>
           <div style={{ display: 'flex', gap: 2 }}>
             <TabButton theme={theme} active={mode === 'chat'} onClick={() => setMode('chat')}>Chat</TabButton>
-            <TabButton theme={theme} active={mode === 'reader'} onClick={() => setMode('reader')}>Reader mode</TabButton>
+            <TabButton theme={theme} active={mode === 'reader'} onClick={() => setMode('reader')}>
+              <span>Reader mode</span>
+              {cached && (
+                <span
+                  title={`Summary cached · ${cached.backend}`}
+                  style={{
+                    display: 'inline-block', width: 6, height: 6, borderRadius: 3,
+                    marginLeft: 7, verticalAlign: 'middle',
+                    background: t.green,
+                  }}
+                />
+              )}
+            </TabButton>
           </div>
         </div>
       </div>
@@ -158,7 +180,16 @@ export function SessionDetail({
       >
         <div style={innerWrapStyle}>
           {mode === 'reader' && (
-            <SummaryPanel key={session.id} theme={theme} sessionId={session.id} />
+            <SummaryPanel
+              // Key in the cache version so the panel re-initializes when a
+              // newly-loaded cached row arrives (status fetch is async, and
+              // initial state is set from `preloaded` at mount only).
+              key={`${session.id}:${cached?.createdAt ?? 'none'}`}
+              theme={theme}
+              sessionId={session.id}
+              preloaded={preloadedSummary}
+              onGenerated={() => setSummaryRefresh((n) => n + 1)}
+            />
           )}
           {loading && entries.length === 0 && (
             <div style={{ padding: 24, color: t.dim, fontSize: 13, fontFamily: monoFont }}>loading entries…</div>

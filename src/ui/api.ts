@@ -128,6 +128,34 @@ export async function fetchSessionFile(sessionId: string, filePath: string, sign
   return (await r.json()) as SessionFile;
 }
 
+export interface SummaryStatus {
+  backend: string;
+  text: string;
+  createdAt: string;
+}
+
+export function useSummaryStatus(sessionId: string | undefined, refreshKey: number): { data: SummaryStatus[]; loading: boolean } {
+  const [data, setData] = useState<SummaryStatus[]>([]);
+  const [loading, setLoading] = useState<boolean>(false);
+  useEffect(() => {
+    setData([]);
+    if (!sessionId) return;
+    const parts = splitSessionId(sessionId);
+    if (!parts) return;
+    const ac = new AbortController();
+    setLoading(true);
+    fetchJson<{ summaries: SummaryStatus[] }>(
+      `/api/sessions/${encodeURIComponent(parts.sourceId)}/${encodeURIComponent(parts.sessionId)}/summary/status`,
+      ac.signal,
+    )
+      .then((r) => setData(r.summaries))
+      .catch(() => { /* status probe is best-effort */ })
+      .finally(() => setLoading(false));
+    return () => ac.abort();
+  }, [sessionId, refreshKey]);
+  return { data, loading };
+}
+
 export async function sendSessionInput(sessionId: string, text: string): Promise<void> {
   const parts = splitSessionId(sessionId);
   if (!parts) throw new Error('bad session id');
