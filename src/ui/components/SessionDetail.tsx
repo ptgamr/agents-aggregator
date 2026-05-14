@@ -16,6 +16,9 @@ interface SessionDetailProps {
   treatment: AgentTreatment;
   dense: boolean;
   loud: boolean;
+  /** Reader mode: hide tool calls, tool results, bash, and thinking entries
+   *  — leaving just user/assistant prose. */
+  readerMode: boolean;
   session: Session | undefined;
   sources: Source[];
   entries: Entry[];
@@ -34,7 +37,7 @@ interface SessionDetailProps {
 }
 
 export function SessionDetail({
-  theme, treatment, dense, loud, session, sources, entries, selectedEntryId, setSelectedEntryId, loading, onBack, blurred,
+  theme, treatment, dense, loud, readerMode, session, sources, entries, selectedEntryId, setSelectedEntryId, loading, onBack, blurred,
   inTab, isPinned, onTogglePin, onOpenInTab, onBackHome,
 }: SessionDetailProps) {
   const t = themes[theme];
@@ -138,7 +141,7 @@ export function SessionDetail({
             <div style={{ padding: 24, color: t.dim, fontSize: 13, fontFamily: monoFont }}>loading entries…</div>
           )}
           <ChatView theme={theme} treatment={treatment} dense={dense}
-                    entries={entries} session={session}
+                    entries={entries} session={session} readerMode={readerMode}
                     selectedEntryId={selectedEntryId} setSelectedEntryId={setSelectedEntryId} />
         </div>
       </div>
@@ -235,17 +238,36 @@ interface ChatViewProps {
   dense: boolean;
   entries: Entry[];
   session: Session;
+  readerMode: boolean;
   selectedEntryId: string | undefined;
   setSelectedEntryId: (id: string) => void;
 }
 
-function ChatView({ theme, treatment, entries, session, selectedEntryId, setSelectedEntryId }: ChatViewProps) {
+function isReadable(e: Entry): boolean {
+  if (e.role !== 'user' && e.role !== 'assistant') return false;
+  if (e.text && e.text.trim().length > 0) return true;
+  if (e.images && e.images.length > 0) return true;
+  return false;
+}
+
+function ChatView({ theme, treatment, entries, session, readerMode, selectedEntryId, setSelectedEntryId }: ChatViewProps) {
+  const t = themes[theme];
+  const visible = readerMode ? entries.filter(isReadable) : entries;
+  const hidden = readerMode ? entries.length - visible.length : 0;
   return (
     <div>
-      {entries.map((e, i) => (
+      {readerMode && hidden > 0 && (
+        <div style={{
+          fontFamily: monoFont, fontSize: 11, color: t.dim2,
+          padding: '6px 4px 10px', letterSpacing: '0.04em',
+        }}>
+          reader mode · {hidden} tool / thinking {hidden === 1 ? 'entry' : 'entries'} hidden
+        </div>
+      )}
+      {visible.map((e, i) => (
         <EntryBlock key={e.id} entry={e} theme={theme} session={session}
                     compact={false} treatment={treatment}
-                    isNew={i === entries.length - 1}
+                    isNew={i === visible.length - 1}
                     selected={e.id === selectedEntryId}
                     onSelect={setSelectedEntryId} />
       ))}
