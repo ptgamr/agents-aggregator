@@ -19,7 +19,7 @@ export function SessionList({ theme, treatment, dense, sessions, sources, active
   return (
     <div style={{
       borderRight: `1px solid ${t.border}`, background: t.bg,
-      display: 'flex', flexDirection: 'column', minHeight: 0,
+      display: 'flex', flexDirection: 'column', minHeight: 0, minWidth: 0,
     }}>
       <div style={{
         display: 'flex', alignItems: 'center', gap: 8,

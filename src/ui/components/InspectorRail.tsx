@@ -16,7 +16,7 @@ export function InspectorRail({ theme, entry, session }: InspectorRailProps) {
   return (
     <div style={{
       background: t.panel, borderLeft: `1px solid ${t.border}`,
-      display: 'flex', flexDirection: 'column', minHeight: 0,
+      display: 'flex', flexDirection: 'column', minHeight: 0, minWidth: 0,
     }}>
       <div style={{ padding: '14px 16px', borderBottom: `1px solid ${t.border}` }}>
         <div style={{ color: t.dim2, fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 600, marginBottom: 6 }}>

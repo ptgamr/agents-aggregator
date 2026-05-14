@@ -24,7 +24,7 @@ export function SourcesRail({ theme, treatment, sources, sessions, filter, setFi
   return (
     <div style={{
       borderRight: `1px solid ${t.border}`, background: t.panel,
-      display: 'flex', flexDirection: 'column', minHeight: 0,
+      display: 'flex', flexDirection: 'column', minHeight: 0, minWidth: 0,
     }}>
       <div style={{ padding: '14px 14px 8px', display: 'flex', alignItems: 'baseline', gap: 8 }}>
         <span style={{ color: t.dim2, fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 600 }}>

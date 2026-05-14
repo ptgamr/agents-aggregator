@@ -41,7 +41,7 @@ export function SessionDetail({
   const sourceLabel = (sources.find((x) => x.id === session.sourceId) || { label: '' }).label;
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', minHeight: 0, background: t.bg }}>
+    <div style={{ display: 'flex', flexDirection: 'column', minHeight: 0, minWidth: 0, background: t.bg }}>
       <div style={{ padding: '14px 22px', borderBottom: `1px solid ${t.border}` }}>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 6, flexWrap: 'wrap' }}>
           <span style={{ display: 'inline-flex', whiteSpace: 'nowrap' }}>
@@ -91,7 +91,7 @@ export function SessionDetail({
         </div>
       </div>
 
-      <div ref={scrollRef} style={{ flex: 1, overflow: 'auto', padding: shape === 'timeline' ? '0' : '6px 22px 20px' }}>
+      <div ref={scrollRef} style={{ flex: 1, minWidth: 0, overflow: 'auto', padding: shape === 'timeline' ? '0' : '6px 22px 20px' }}>
         {loading && entries.length === 0 && (
           <div style={{ padding: 24, color: t.dim, fontSize: 12, fontFamily: monoFont }}>loading entries…</div>
         )}

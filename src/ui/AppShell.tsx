@@ -135,10 +135,19 @@ export function AppShell() {
           from { background: ${t.green}44; }
           to   { background: transparent; }
         }
-        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar { width: 12px; height: 12px; }
         ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: ${t.border}; border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: ${t.dim2}; }
+        ::-webkit-scrollbar-thumb {
+          background: ${t.dim2};
+          border-radius: 6px;
+          border: 3px solid transparent;
+          background-clip: padding-box;
+          min-height: 40px;
+          min-width: 40px;
+        }
+        ::-webkit-scrollbar-thumb:hover { background: ${t.dim}; background-clip: padding-box; }
+        ::-webkit-scrollbar-corner { background: transparent; }
+        * { scrollbar-width: thin; scrollbar-color: ${t.dim2} transparent; }
         input::placeholder { color: ${t.dim2}; }
         button { font-family: ${monoFont}; }
       `}</style>
@@ -157,6 +166,7 @@ export function AppShell() {
         gridTemplateColumns: tw.detailShape === 'inspect'
           ? '210px 340px 1fr 340px'
           : '210px 360px 1fr',
+        gridTemplateRows: 'minmax(0, 1fr)',
         minHeight: 0,
       }}>
         <SourcesRail

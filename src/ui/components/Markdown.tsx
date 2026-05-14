@@ -98,7 +98,12 @@ export function Markdown({ theme, content, compact }: MarkdownProps) {
   };
 
   return (
-    <div style={{ color: fg, fontSize: compact ? 12.5 : 13 }} className="md">
+    <div style={{
+      color: fg, fontSize: compact ? 12.5 : 13,
+      // Long URLs, JSON, identifiers must wrap or they push the column wide.
+      overflowWrap: 'anywhere', wordBreak: 'break-word',
+      minWidth: 0,
+    }} className="md">
       <style>{`.md > *:last-child { margin-bottom: 0 !important; }`}</style>
       <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>{content}</ReactMarkdown>
     </div>
