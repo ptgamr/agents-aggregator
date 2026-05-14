@@ -13,16 +13,20 @@ export interface EntriesResponse { entries: Entry[]; }
 export interface Project { cwd: string; count: number; latestAt: string; }
 export interface ProjectsResponse { projects: Project[]; }
 
-export function useSources(refreshKey: number): { data: Source[]; error: Error | null } {
+export function useSources(filter: { project?: string | null; q?: string }, refreshKey: number): { data: Source[]; error: Error | null } {
   const [data, setData] = useState<Source[]>([]);
   const [error, setError] = useState<Error | null>(null);
   useEffect(() => {
     const ac = new AbortController();
-    fetchJson<SourcesResponse>('/api/sources', ac.signal)
+    const params = new URLSearchParams();
+    if (filter.project) params.set('project', filter.project);
+    if (filter.q) params.set('q', filter.q);
+    const qs = params.toString();
+    fetchJson<SourcesResponse>(`/api/sources${qs ? `?${qs}` : ''}`, ac.signal)
       .then((r) => setData(r.sources))
       .catch((e) => { if (e.name !== 'AbortError') setError(e as Error); });
     return () => ac.abort();
-  }, [refreshKey]);
+  }, [filter.project, filter.q, refreshKey]);
   return { data, error };
 }
 
@@ -44,16 +48,20 @@ export function useSessions(filter: { sourceId?: string | null; q?: string; proj
   return { data, error };
 }
 
-export function useProjects(refreshKey: number): { data: Project[]; error: Error | null } {
+export function useProjects(filter: { sourceId?: string | null; q?: string }, refreshKey: number): { data: Project[]; error: Error | null } {
   const [data, setData] = useState<Project[]>([]);
   const [error, setError] = useState<Error | null>(null);
   useEffect(() => {
     const ac = new AbortController();
-    fetchJson<ProjectsResponse>('/api/projects', ac.signal)
+    const params = new URLSearchParams();
+    if (filter.sourceId) params.set('source', filter.sourceId);
+    if (filter.q) params.set('q', filter.q);
+    const qs = params.toString();
+    fetchJson<ProjectsResponse>(`/api/projects${qs ? `?${qs}` : ''}`, ac.signal)
       .then((r) => setData(r.projects))
       .catch((e) => { if (e.name !== 'AbortError') setError(e as Error); });
     return () => ac.abort();
-  }, [refreshKey]);
+  }, [filter.sourceId, filter.q, refreshKey]);
   return { data, error };
 }
 

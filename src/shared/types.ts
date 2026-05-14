@@ -6,7 +6,7 @@ export interface Source {
   agent: AgentType;
   root: string;
   enabled: boolean;
-  sessions?: number;
+  count?: number;
 }
 
 export interface Session {
@@ -47,6 +47,15 @@ export function splitSessionId(id: string): { sourceId: string; sessionId: strin
   return { sourceId: id.slice(0, i), sessionId: id.slice(i + 1) };
 }
 
+export interface EntryImage {
+  /** MIME like "image/png". Defaults to "image/png" when unknown. */
+  mime: string;
+  /** Base64-encoded payload (no `data:` prefix). Set this OR `url`. */
+  data?: string;
+  /** Direct URL alternative to `data`. */
+  url?: string;
+}
+
 export interface Entry {
   id: string;
   role: EntryRole;
@@ -61,4 +70,5 @@ export interface Entry {
   out?: string;
   ok?: boolean;
   summary?: string;
+  images?: EntryImage[];
 }

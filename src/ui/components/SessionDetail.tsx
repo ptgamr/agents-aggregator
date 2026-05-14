@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { Entry, Session, Source } from '../../shared/types';
+import type { BlurredProjects } from '../hooks/useBlurredProjects';
 import { sendSessionInput } from '../api';
 import { lastPathSegment, relativeTime } from '../format';
 import { AgentChip, LivePip } from './AgentChip';
@@ -23,10 +24,11 @@ interface SessionDetailProps {
   setSelectedEntryId: (id: string) => void;
   loading?: boolean;
   onBack?: () => void;
+  blurred: BlurredProjects;
 }
 
 export function SessionDetail({
-  theme, treatment, dense, loud, shape, session, sources, entries, selectedEntryId, setSelectedEntryId, loading, onBack,
+  theme, treatment, dense, loud, shape, session, sources, entries, selectedEntryId, setSelectedEntryId, loading, onBack, blurred,
 }: SessionDetailProps) {
   const t = themes[theme];
   const scrollRef = useRef<HTMLDivElement | null>(null);
@@ -42,6 +44,7 @@ export function SessionDetail({
   if (!session) return <div style={{ background: t.bg }} />;
 
   const sourceLabel = (sources.find((x) => x.id === session.sourceId) || { label: '' }).label;
+  const sessionBlurred = blurred.has(session.cwd);
 
   const pad = onBack ? 12 : 22;
   return (
@@ -71,11 +74,17 @@ export function SessionDetail({
             <span style={{ padding: '3px 8px', background: t.panel, border: `1px solid ${t.border}`, borderRadius: 4 }}>⋯</span>
           </div>
         </div>
-        <div style={{ fontSize: 18, fontWeight: 600, color: t.fg, letterSpacing: '-0.005em' }}>
+        <div
+          className={sessionBlurred ? 'blur-text' : undefined}
+          style={{ fontSize: 18, fontWeight: 600, color: t.fg, letterSpacing: '-0.005em' }}
+        >
           {session.name || <span style={{ color: t.dim2, fontStyle: 'italic', fontWeight: 400 }}>Untitled session</span>}
         </div>
         <div style={{ display: 'flex', gap: 16, fontSize: 12, color: t.dim, marginTop: 6, fontFamily: monoFont, flexWrap: 'wrap' }}>
-          <span title={session.cwd}>{lastPathSegment(session.cwd)}</span>
+          <span
+            title={sessionBlurred ? undefined : session.cwd}
+            className={sessionBlurred ? 'blur-text' : undefined}
+          >{lastPathSegment(session.cwd)}</span>
           <span>{session.model}</span>
           <span title={session.updatedAt}>{relativeTime(session.updatedAt)}</span>
           <span>${session.costUsd?.toFixed(2) ?? '—'}</span>
@@ -102,7 +111,15 @@ export function SessionDetail({
         </div>
       </div>
 
-      <div ref={scrollRef} style={{ flex: 1, minWidth: 0, overflow: 'auto', padding: shape === 'timeline' ? '0' : `6px ${pad}px 20px` }}>
+      <div
+        ref={scrollRef}
+        style={{
+          flex: 1, minWidth: 0, overflow: 'auto',
+          padding: shape === 'timeline' ? '0' : `6px ${pad}px 20px`,
+          filter: sessionBlurred ? 'blur(7px)' : undefined,
+          userSelect: sessionBlurred ? 'none' : undefined,
+        }}
+      >
         {loading && entries.length === 0 && (
           <div style={{ padding: 24, color: t.dim, fontSize: 13, fontFamily: monoFont }}>loading entries…</div>
         )}

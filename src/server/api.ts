@@ -10,7 +10,12 @@ import type { AgentType } from '../shared/types';
 export const app = new Hono();
 
 app.get('/api/sources', (c) => {
-  return c.json({ sources: sourcesRepo.list() });
+  const url = new URL(c.req.url);
+  const project = url.searchParams.get('project');
+  const q = url.searchParams.get('q');
+  const counts = sessionsRepo.countsBySource({ project, q });
+  const sources = sourcesRepo.list().map((s) => ({ ...s, count: counts[s.id] ?? 0 }));
+  return c.json({ sources });
 });
 
 app.get('/api/sessions', (c) => {
@@ -26,7 +31,10 @@ app.get('/api/sessions', (c) => {
 });
 
 app.get('/api/projects', (c) => {
-  return c.json({ projects: sessionsRepo.projects() });
+  const url = new URL(c.req.url);
+  const sourceId = url.searchParams.get('source');
+  const q = url.searchParams.get('q');
+  return c.json({ projects: sessionsRepo.projects({ sourceId, q }) });
 });
 
 app.get('/api/sessions/:sourceId/:sessionId', (c) => {

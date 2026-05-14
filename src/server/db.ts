@@ -166,16 +166,42 @@ export const sessionsRepo = {
                  ORDER BY updatedAt DESC`;
     return getDb().prepare<typeof params, SessionRow>(sql).all(params).map(rowToSession);
   },
-  projects(): { cwd: string; count: number; latestAt: string }[] {
+  projects(opts: { sourceId?: string | null; q?: string | null } = {}): { cwd: string; count: number; latestAt: string }[] {
+    const where: string[] = [`cwd IS NOT NULL`, `cwd <> ''`];
+    const params: Record<string, unknown> = {};
+    if (opts.sourceId) { where.push('sourceId = @sourceId'); params.sourceId = opts.sourceId; }
+    if (opts.q) {
+      where.push('(COALESCE(name,"") LIKE @q OR COALESCE(cwd,"") LIKE @q OR COALESCE(model,"") LIKE @q)');
+      params.q = `%${opts.q}%`;
+    }
     return getDb()
-      .prepare<unknown[], { cwd: string; count: number; latestAt: string }>(
+      .prepare<typeof params, { cwd: string; count: number; latestAt: string }>(
         `SELECT cwd, COUNT(*) AS count, MAX(updatedAt) AS latestAt
          FROM session
-         WHERE cwd IS NOT NULL AND cwd <> ''
+         WHERE ${where.join(' AND ')}
          GROUP BY cwd
          ORDER BY latestAt DESC`,
       )
-      .all();
+      .all(params);
+  },
+  countsBySource(opts: { project?: string | null; q?: string | null } = {}): Record<string, number> {
+    const where: string[] = [];
+    const params: Record<string, unknown> = {};
+    if (opts.project) { where.push('cwd = @project'); params.project = opts.project; }
+    if (opts.q) {
+      where.push('(COALESCE(name,"") LIKE @q OR COALESCE(cwd,"") LIKE @q OR COALESCE(model,"") LIKE @q)');
+      params.q = `%${opts.q}%`;
+    }
+    const rows = getDb()
+      .prepare<typeof params, { sourceId: string; count: number }>(
+        `SELECT sourceId, COUNT(*) AS count FROM session
+         ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
+         GROUP BY sourceId`,
+      )
+      .all(params);
+    const m: Record<string, number> = {};
+    for (const r of rows) m[r.sourceId] = r.count;
+    return m;
   },
   find(sourceId: string, sessionId: string): (Session & { filePath: string }) | null {
     const r = getDb()

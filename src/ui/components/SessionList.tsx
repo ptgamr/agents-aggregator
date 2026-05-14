@@ -1,4 +1,5 @@
 import type { Session, Source } from '../../shared/types';
+import type { BlurredProjects } from '../hooks/useBlurredProjects';
 import { AgentChip, LivePip } from './AgentChip';
 import { lastPathSegment, relativeTime } from '../format';
 import { monoFont, themes, type AgentTreatment, type ThemeMode } from '../theme';
@@ -12,9 +13,10 @@ interface SessionListProps {
   activeId: string;
   setActiveId: (id: string) => void;
   loud: boolean;
+  blurred: BlurredProjects;
 }
 
-export function SessionList({ theme, treatment, dense, sessions, sources, activeId, setActiveId, loud }: SessionListProps) {
+export function SessionList({ theme, treatment, dense, sessions, sources, activeId, setActiveId, loud, blurred }: SessionListProps) {
   const t = themes[theme];
 
   return (
@@ -42,6 +44,7 @@ export function SessionList({ theme, treatment, dense, sessions, sources, active
             theme={theme} treatment={treatment} dense={dense} loud={loud}
             session={s} sources={sources} active={s.id === activeId}
             onClick={() => setActiveId(s.id)}
+            isBlurred={blurred.has(s.cwd)}
           />
         ))}
         {sessions.length === 0 && (
@@ -63,9 +66,10 @@ interface SessionRowProps {
   sources: Source[];
   active: boolean;
   onClick: () => void;
+  isBlurred: boolean;
 }
 
-function SessionRow({ theme, treatment, dense, loud, session: s, sources, active, onClick }: SessionRowProps) {
+function SessionRow({ theme, treatment, dense, loud, session: s, sources, active, onClick, isBlurred }: SessionRowProps) {
   const t = themes[theme];
   const padY = dense ? 9 : 12;
   const sourceLabel = (sources.find((x) => x.id === s.sourceId) || { label: '' }).label;
@@ -94,21 +98,28 @@ function SessionRow({ theme, treatment, dense, loud, session: s, sources, active
           {relativeTime(s.updatedAt)}
         </span>
       </div>
-      <div style={{
-        color: t.fg, fontSize: dense ? 13.5 : 14, fontWeight: 500,
-        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-        marginBottom: dense ? 2 : 4,
-      }}>
+      <div
+        className={isBlurred ? 'blur-text' : undefined}
+        style={{
+          color: t.fg, fontSize: dense ? 13.5 : 14, fontWeight: 500,
+          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          marginBottom: dense ? 2 : 4,
+        }}
+      >
         {s.name || <span style={{ color: t.dim2, fontWeight: 400, fontStyle: 'italic' }}>Untitled</span>}
       </div>
       <div style={{
         display: 'flex', gap: 8, fontSize: 12, color: t.dim, fontFamily: monoFont,
         alignItems: 'center',
       }}>
-        <span title={s.cwd} style={{
-          flex: 1, minWidth: 0,
-          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-        }}>{lastPathSegment(s.cwd)}</span>
+        <span
+          title={isBlurred ? undefined : s.cwd}
+          className={isBlurred ? 'blur-text' : undefined}
+          style={{
+            flex: 1, minWidth: 0,
+            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          }}
+        >{lastPathSegment(s.cwd)}</span>
         <span>{s.messageCount}</span>
         {s.costUsd != null && <span>${s.costUsd.toFixed(2)}</span>}
         {s.branches > 0 && <span style={{ color: t.amber }}>⌥{s.branches}</span>}

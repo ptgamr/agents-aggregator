@@ -2,6 +2,7 @@ import type { ComponentPropsWithoutRef, ReactNode } from 'react';
 import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { monoFont, themes, type ThemeMode } from '../theme';
+import { useLightbox } from './Lightbox';
 
 interface MarkdownProps {
   theme: ThemeMode;
@@ -14,6 +15,7 @@ export function Markdown({ theme, content, compact }: MarkdownProps) {
   const t = themes[theme];
   const fg = compact ? t.dim : t.fg;
   const fg2 = compact ? t.dim2 : t.fg2;
+  const { open: openLightbox } = useLightbox();
 
   const components: Components = {
     p: ({ children }) => (
@@ -81,6 +83,23 @@ export function Markdown({ theme, content, compact }: MarkdownProps) {
         overflow: 'auto', lineHeight: 1.45,
       }}>{children}</pre>
     ),
+    img: ({ src, alt, title }) => {
+      if (!src) return null;
+      const safeSrc = typeof src === 'string' ? src : '';
+      if (!safeSrc) return null;
+      return (
+        <img
+          src={safeSrc} alt={alt ?? ''} title={title} loading="lazy"
+          onClick={(e) => { e.stopPropagation(); openLightbox([{ src: safeSrc, alt: alt ?? '' }], 0); }}
+          style={{
+            maxWidth: '100%', maxHeight: 320, height: 'auto',
+            borderRadius: 6, border: `1px solid ${t.border2}`,
+            background: t.panel2, display: 'block', margin: '6px 0',
+            cursor: 'zoom-in',
+          }}
+        />
+      );
+    },
     table: ({ children }) => (
       <div style={{ overflowX: 'auto', margin: '0 0 0.6em' }}>
         <table style={{ borderCollapse: 'collapse', fontSize: '0.95em' }}>{children}</table>

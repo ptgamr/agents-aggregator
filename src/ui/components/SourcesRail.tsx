@@ -1,6 +1,6 @@
-import { useMemo } from 'react';
-import type { Session, Source } from '../../shared/types';
+import type { Source } from '../../shared/types';
 import type { Project } from '../api';
+import type { BlurredProjects } from '../hooks/useBlurredProjects';
 import { lastPathSegment } from '../format';
 import { AgentChip } from './AgentChip';
 import { monoFont, sansFont, themes, type AgentTreatment, type ThemeMode } from '../theme';
@@ -9,31 +9,43 @@ interface SourcesRailProps {
   theme: ThemeMode;
   treatment: AgentTreatment;
   sources: Source[];
-  sessions: Session[];
   filter: string | null;
   setFilter: (id: string | null) => void;
   projects: Project[];
   projectFilter: string | null;
   setProjectFilter: (cwd: string | null) => void;
   dense: boolean;
+  blurred: BlurredProjects;
 }
 
+const RAIL_STYLE = `
+  .proj-row { position: relative; }
+  .proj-row .proj-blur-btn {
+    appearance: none; border: 0; background: transparent;
+    width: 18px; height: 18px; padding: 0; border-radius: 4px;
+    display: inline-flex; align-items: center; justify-content: center;
+    cursor: pointer; opacity: 0; transition: opacity .12s, background .12s;
+    color: inherit;
+  }
+  .proj-row:hover .proj-blur-btn { opacity: 0.55; }
+  .proj-row .proj-blur-btn[data-on="1"] { opacity: 0.9; }
+  .proj-row .proj-blur-btn:hover { background: rgba(127,127,127,.18); opacity: 1; }
+`;
+
 export function SourcesRail({
-  theme, treatment, sources, sessions, filter, setFilter,
-  projects, projectFilter, setProjectFilter, dense,
+  theme, treatment, sources, filter, setFilter,
+  projects, projectFilter, setProjectFilter, dense, blurred,
 }: SourcesRailProps) {
   const t = themes[theme];
-  const counts = useMemo(() => {
-    const m: Record<string, number> = {};
-    sessions.forEach((s) => { m[s.sourceId] = (m[s.sourceId] || 0) + 1; });
-    return m;
-  }, [sessions]);
+  const totalSourceCount = sources.reduce((n, s) => n + (s.count ?? 0), 0);
+  const totalProjectCount = projects.reduce((n, p) => n + p.count, 0);
 
   return (
     <div style={{
       borderRight: `1px solid ${t.border}`, background: t.panel,
       display: 'flex', flexDirection: 'column', minHeight: 0, minWidth: 0,
     }}>
+      <style>{RAIL_STYLE}</style>
       <div style={{ flex: 1, overflow: 'auto', padding: '0 6px 8px' }}>
         <div style={{ padding: '14px 8px 6px', display: 'flex', alignItems: 'baseline', gap: 8 }}>
           <span style={{ color: t.dim2, fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', fontWeight: 600 }}>
@@ -45,14 +57,14 @@ export function SourcesRail({
         </div>
         <SourceRow
           theme={theme} treatment={treatment} dense={dense}
-          label="All sources" agent={null} count={sessions.length}
+          label="All sources" agent={null} count={totalSourceCount}
           active={filter === null} onClick={() => setFilter(null)}
         />
         {sources.map((src) => (
           <SourceRow key={src.id}
             theme={theme} treatment={treatment} dense={dense}
             label={src.label} agent={src.agent}
-            count={counts[src.id] || 0} enabled={src.enabled}
+            count={src.count ?? 0} enabled={src.enabled}
             active={filter === src.id}
             onClick={() => setFilter(filter === src.id ? null : src.id)}
           />
@@ -69,8 +81,9 @@ export function SourcesRail({
         {projectFilter && (
           <ProjectRow
             theme={theme} dense={dense}
-            cwd="" label="All projects" count={sessions.length}
+            cwd="" label="All projects" count={totalProjectCount}
             active={false} onClick={() => setProjectFilter(null)}
+            isBlurred={false}
           />
         )}
         {projects.map((p) => (
@@ -80,6 +93,8 @@ export function SourcesRail({
             count={p.count}
             active={projectFilter === p.cwd}
             onClick={() => setProjectFilter(projectFilter === p.cwd ? null : p.cwd)}
+            isBlurred={blurred.has(p.cwd)}
+            onToggleBlur={() => blurred.toggle(p.cwd)}
           />
         ))}
       </div>
@@ -110,13 +125,15 @@ interface ProjectRowProps {
   count: number;
   active: boolean;
   onClick: () => void;
+  isBlurred: boolean;
+  onToggleBlur?: () => void;
 }
 
-function ProjectRow({ theme, dense, cwd, label, count, active, onClick }: ProjectRowProps) {
+function ProjectRow({ theme, dense, cwd, label, count, active, onClick, isBlurred, onToggleBlur }: ProjectRowProps) {
   const t = themes[theme];
   const isClear = label === 'All projects';
   return (
-    <div onClick={onClick} title={cwd || undefined} style={{
+    <div className="proj-row" onClick={onClick} title={cwd || undefined} style={{
       display: 'flex', alignItems: 'center', gap: 8,
       padding: dense ? '6px 8px' : '8px 10px',
       margin: '1px 0', borderRadius: 5,
@@ -128,13 +145,38 @@ function ProjectRow({ theme, dense, cwd, label, count, active, onClick }: Projec
       <span style={{
         width: 18, color: isClear ? t.dim : t.dim, fontSize: 12, textAlign: 'center',
       }}>{isClear ? '✕' : '▸'}</span>
-      <span style={{
-        color: t.fg, fontSize: dense ? 13 : 13.5,
-        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-        flex: 1, minWidth: 0, fontFamily: isClear ? sansFont : monoFont,
-      }}>{label}</span>
+      <span
+        className={isBlurred ? 'blur-text' : undefined}
+        style={{
+          color: t.fg, fontSize: dense ? 13 : 13.5,
+          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+          flex: 1, minWidth: 0, fontFamily: isClear ? sansFont : monoFont,
+        }}
+      >{label}</span>
+      {onToggleBlur && (
+        <button
+          className="proj-blur-btn"
+          data-on={isBlurred ? '1' : '0'}
+          aria-label={isBlurred ? 'Unblur project' : 'Blur project for recording'}
+          title={isBlurred ? 'Click to show again' : 'Hide for recording'}
+          onClick={(e) => { e.stopPropagation(); onToggleBlur(); }}
+        >
+          <BlurIcon on={isBlurred} />
+        </button>
+      )}
       <span style={{ color: t.dim2, fontSize: 12, fontFamily: monoFont }}>{count}</span>
     </div>
+  );
+}
+
+function BlurIcon({ on }: { on: boolean }) {
+  // Eye / eye-with-slash.
+  return (
+    <svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M1.5 8s2.4-4.5 6.5-4.5S14.5 8 14.5 8s-2.4 4.5-6.5 4.5S1.5 8 1.5 8z" />
+      <circle cx="8" cy="8" r="2" />
+      {on && <line x1="2" y1="14" x2="14" y2="2" />}
+    </svg>
   );
 }
 

@@ -1,8 +1,9 @@
 import type { CSSProperties, ReactNode } from 'react';
-import type { Entry, Session } from '../../shared/types';
+import type { Entry, EntryImage, Session } from '../../shared/types';
 import { LivePip } from './AgentChip';
 import { DiffView } from './DiffView';
 import { Markdown } from './Markdown';
+import { useLightbox, type LightboxImage } from './Lightbox';
 import {
   AGENT_GLYPHS, AGENT_HUES,
   monoFont, sansFont, themes,
@@ -151,7 +152,8 @@ export function EntryBlock({ entry: e, theme, session, compact, isNew, selected,
           )}
         </div>
         <div style={{ color: t.fg, fontSize: 14, lineHeight: 1.55 }}>
-          <Markdown theme={theme} content={e.text ?? ''} />
+          {e.text && <Markdown theme={theme} content={e.text} />}
+          {e.images && e.images.length > 0 && <Images images={e.images} theme={theme} />}
           {e.streaming && (
             <span style={{
               display: 'inline-block', width: 7, height: 14, marginLeft: 2,
@@ -161,6 +163,44 @@ export function EntryBlock({ entry: e, theme, session, compact, isNew, selected,
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+// ── Inline images ───────────────────────────────────────────────────────────
+
+function imageSrc(img: EntryImage): string {
+  if (img.url) return img.url;
+  if (img.data) return `data:${img.mime || 'image/png'};base64,${img.data}`;
+  return '';
+}
+
+function Images({ images, theme }: { images: EntryImage[]; theme: ThemeMode }) {
+  const t = themes[theme];
+  const { open } = useLightbox();
+  const lbImages: LightboxImage[] = images
+    .map((img) => ({ src: imageSrc(img) }))
+    .filter((x) => x.src);
+  return (
+    <div style={{
+      display: 'flex', flexWrap: 'wrap', gap: 8,
+      margin: '8px 0 4px',
+    }}>
+      {images.map((img, i) => {
+        const src = imageSrc(img);
+        if (!src) return null;
+        return (
+          <img
+            key={i} src={src} alt="" loading="lazy"
+            onClick={(e) => { e.stopPropagation(); open(lbImages, i); }}
+            style={{
+              maxWidth: '100%', maxHeight: 320, height: 'auto',
+              borderRadius: 6, border: `1px solid ${t.border2}`,
+              background: t.panel2, display: 'block', cursor: 'zoom-in',
+            }}
+          />
+        );
+      })}
     </div>
   );
 }

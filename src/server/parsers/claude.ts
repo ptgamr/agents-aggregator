@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { composeSessionId, type Entry, type Session } from '../../shared/types';
+import { composeSessionId, type Entry, type EntryImage, type Session } from '../../shared/types';
 import type { Parser, SessionFile } from './base';
 
 interface ClaudeAssistantUsage {
@@ -26,11 +26,30 @@ interface ClaudeMessageLine {
   };
 }
 
+type ClaudeImageSource =
+  | { type: 'base64'; media_type: string; data: string }
+  | { type: 'url'; url: string };
+
 type ClaudeContentBlock =
   | { type: 'text'; text: string }
   | { type: 'thinking'; thinking: string; signature?: string }
+  | { type: 'image'; source: ClaudeImageSource }
   | { type: 'tool_use'; id: string; name: string; input: Record<string, unknown> }
   | { type: 'tool_result'; tool_use_id: string; content: string | ClaudeContentBlock[]; is_error?: boolean };
+
+function imageFromBlock(p: Extract<ClaudeContentBlock, { type: 'image' }>): EntryImage | null {
+  const src = p.source;
+  if (!src) return null;
+  if (src.type === 'base64') {
+    if (!src.data) return null;
+    return { mime: src.media_type || 'image/png', data: src.data };
+  }
+  if (src.type === 'url') {
+    if (!src.url) return null;
+    return { mime: 'image/*', url: src.url };
+  }
+  return null;
+}
 
 interface ClaudeTitleLine { type: 'ai-title'; aiTitle: string; sessionId: string; }
 type ClaudeLine = ClaudeMessageLine | ClaudeTitleLine | { type: string; [k: string]: unknown };
@@ -187,10 +206,23 @@ export const claudeParser: Parser = {
           continue;
         }
         if (!Array.isArray(c)) continue;
+        let lastUserEntry: Entry | null = null;
         c.forEach((p, i) => {
           const eid = c.length === 1 ? m.uuid : `${m.uuid}#${i}`;
           if (p.type === 'text') {
-            if (p.text.trim()) out.push({ id: eid, role: 'user', timestamp: ts, text: p.text });
+            if (p.text.trim()) {
+              lastUserEntry = { id: eid, role: 'user', timestamp: ts, text: p.text };
+              out.push(lastUserEntry);
+            }
+          } else if (p.type === 'image') {
+            const img = imageFromBlock(p);
+            if (!img) return;
+            if (lastUserEntry) {
+              (lastUserEntry.images ??= []).push(img);
+            } else {
+              lastUserEntry = { id: eid, role: 'user', timestamp: ts, images: [img] };
+              out.push(lastUserEntry);
+            }
           } else if (p.type === 'tool_result') {
             if (bashToolUseIds.has(p.tool_use_id)) return; // folded into bash entry
             const text = tcToString(p.content);
@@ -207,12 +239,25 @@ export const claudeParser: Parser = {
 
       if (role === 'assistant') {
         if (!Array.isArray(c)) continue;
+        let lastAsstEntry: Entry | null = null;
         c.forEach((p, i) => {
           const eid = c.length === 1 ? m.uuid : `${m.uuid}#${i}`;
           if (p.type === 'text') {
-            if (p.text) out.push({ id: eid, role: 'assistant', timestamp: ts, text: p.text });
+            if (p.text) {
+              lastAsstEntry = { id: eid, role: 'assistant', timestamp: ts, text: p.text };
+              out.push(lastAsstEntry);
+            }
           } else if (p.type === 'thinking') {
             if (p.thinking) out.push({ id: eid, role: 'thinking', timestamp: ts, text: p.thinking });
+          } else if (p.type === 'image') {
+            const img = imageFromBlock(p);
+            if (!img) return;
+            if (lastAsstEntry) {
+              (lastAsstEntry.images ??= []).push(img);
+            } else {
+              lastAsstEntry = { id: eid, role: 'assistant', timestamp: ts, images: [img] };
+              out.push(lastAsstEntry);
+            }
           } else if (p.type === 'tool_use') {
             if (p.name === 'Bash') {
               const r = bashResults.get(p.id);

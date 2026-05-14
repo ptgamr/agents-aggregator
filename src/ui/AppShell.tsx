@@ -13,12 +13,14 @@ import {
 } from './theme';
 import { useTweaks } from './hooks/useTweaks';
 import { useBreakpoint } from './hooks/useBreakpoint';
+import { useBlurredProjects } from './hooks/useBlurredProjects';
 import { useEntries, useEventStream, useProjects, useSessions, useSources } from './api';
 import { TopBar } from './components/TopBar';
 import { SourcesRail } from './components/SourcesRail';
 import { SessionList } from './components/SessionList';
 import { SessionDetail } from './components/SessionDetail';
 import { InspectorRail } from './components/InspectorRail';
+import { LightboxProvider } from './components/Lightbox';
 import {
   TweakRadio,
   TweakSection,
@@ -53,6 +55,7 @@ export function AppShell() {
   const t = themes[tw.theme];
   const dense = tw.density === 'compact';
   const bp = useBreakpoint();
+  const blurred = useBlurredProjects();
 
   const [selectedEntryId, setSelectedEntryId] = useState<string | undefined>(undefined);
   const [tweaksOpen, setTweaksOpen] = useState<boolean>(false);
@@ -76,8 +79,8 @@ export function AppShell() {
     return () => clearTimeout(id);
   }, [searchInput, searchQ, navigate]);
 
-  const { data: sources } = useSources(refreshKey);
-  const { data: projects } = useProjects(refreshKey);
+  const { data: sources } = useSources({ project: projectFilter, q: searchQ || undefined }, refreshKey);
+  const { data: projects } = useProjects({ sourceId: sourceFilter, q: searchQ || undefined }, refreshKey);
   const { data: sessions } = useSessions({ sourceId: sourceFilter, project: projectFilter, q: searchQ || undefined }, refreshKey);
   const { data: entries, loading: entriesLoading } = useEntries(activeId, activeRefreshKey);
 
@@ -137,6 +140,7 @@ export function AppShell() {
   const liveCount = useMemo(() => sessions.filter((s) => s.live).length, [sessions]);
 
   return (
+    <LightboxProvider>
     <div style={{
       width: '100%', height: '100%', background: t.bg, color: t.fg,
       fontFamily: sansFont, fontSize: 14, display: 'flex', flexDirection: 'column',
@@ -168,6 +172,7 @@ export function AppShell() {
         * { scrollbar-width: thin; scrollbar-color: ${t.dim2} transparent; }
         input::placeholder { color: ${t.dim2}; }
         button { font-family: ${monoFont}; }
+        .blur-text { filter: blur(5px); user-select: none; }
       `}</style>
 
       <TopBar
@@ -189,11 +194,12 @@ export function AppShell() {
         {bp === 'lg' && (
           <SourcesRail
             theme={tw.theme} treatment={tw.agentTreatment}
-            sources={sources} sessions={sessions}
+            sources={sources}
             filter={sourceFilter} setFilter={setSourceFilter}
             projects={projects}
             projectFilter={projectFilter} setProjectFilter={setProjectFilter}
             dense={dense}
+            blurred={blurred}
           />
         )}
 
@@ -203,6 +209,7 @@ export function AppShell() {
             sessions={sessions} sources={sources}
             activeId={activeId ?? ''} setActiveId={setActiveId}
             loud={tw.liveLoud}
+            blurred={blurred}
           />
         )}
 
@@ -215,6 +222,7 @@ export function AppShell() {
             setSelectedEntryId={setSelectedEntryId}
             loading={entriesLoading}
             onBack={bp === 'sm' ? goToList : undefined}
+            blurred={blurred}
           />
         )}
 
@@ -243,6 +251,7 @@ export function AppShell() {
                      onChange={(v) => setTw('liveLoud', v)} />
       </TweaksPanel>
     </div>
+    </LightboxProvider>
   );
 }
 
