@@ -52,6 +52,12 @@ Or Watch me building it in realtime: https://www.youtube.com/watch?v=ACWjW-3LFS0
   highlighting instead of raw text.
 - **Unified session list** across all sources with filters for source, agent,
   and working directory.
+- **Pinned session tabs**: pin sessions you care about as tabs in a top
+  strip (hover-pin in the list, double-click to open). Opening one drops
+  the sidebars for a focused, full-width chat view; a `← Home` button
+  returns to the three-pane layout. Pinned tabs and active tab persist
+  across reloads, and streaming sessions show a live pip on their tab so
+  you can tell something happened without switching.
 - **Normalized rendering** of user / assistant / tool-call / tool-result /
   thinking / bash blocks regardless of which agent produced them.
 - **Per-file tailing** with debounced `fs.watch`, byte-offset tracking, and
