@@ -6,6 +6,7 @@ import { lastPathSegment, relativeTime } from '../format';
 import { AgentChip, LivePip } from './AgentChip';
 import { EntryBlock } from './EntryBlock';
 import { PinGlyph } from './PinGlyph';
+import { SummaryPanel } from './SummaryPanel';
 import {
   monoFont, themes,
   type AgentTreatment, type Theme, type ThemeMode,
@@ -40,13 +41,25 @@ export function SessionDetail({
   const t = themes[theme];
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const lastCountRef = useRef<number>(entries.length);
+  const [summaryOpen, setSummaryOpen] = useState<boolean>(false);
 
   useEffect(() => {
-    if (entries.length > lastCountRef.current && scrollRef.current) {
+    // Don't auto-scroll to bottom on new entries while the summary panel is open —
+    // it sits above the chat and we'd scroll the user away from it.
+    if (!summaryOpen && entries.length > lastCountRef.current && scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
     lastCountRef.current = entries.length;
-  }, [entries.length]);
+  }, [entries.length, summaryOpen]);
+
+  // Bring the summary panel into view when it opens (it's anchored to the top of the scroll area).
+  useEffect(() => {
+    if (summaryOpen && scrollRef.current) scrollRef.current.scrollTop = 0;
+  }, [summaryOpen]);
+
+  // Close the summary panel on session change — the open panel and its content
+  // belong to whichever session was focused when it was opened.
+  useEffect(() => { setSummaryOpen(false); }, [session?.id]);
 
   if (!session) return <div style={{ background: t.bg }} />;
 
@@ -99,6 +112,11 @@ export function SessionDetail({
                   )}
                 </>
               )}
+              <button
+                onClick={() => setSummaryOpen((v) => !v)}
+                style={headerBtnStyle(t, summaryOpen)}
+                title="Summarize this session"
+              >Summarize</button>
               <button style={headerBtnStyle(t)}>fork</button>
               <button style={headerBtnStyle(t)}>share</button>
               <button style={headerBtnStyle(t)}>⋯</button>
@@ -134,6 +152,9 @@ export function SessionDetail({
         }}
       >
         <div style={innerWrapStyle}>
+          {summaryOpen && (
+            <SummaryPanel theme={theme} sessionId={session.id} onClose={() => setSummaryOpen(false)} />
+          )}
           {loading && entries.length === 0 && (
             <div style={{ padding: 24, color: t.dim, fontSize: 13, fontFamily: monoFont }}>loading entries…</div>
           )}

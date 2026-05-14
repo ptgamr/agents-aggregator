@@ -55,6 +55,16 @@ function initSchema(db: Database.Database): void {
       mtime     INTEGER NOT NULL DEFAULT 0,
       PRIMARY KEY (sourceId, sessionId)
     );
+
+    CREATE TABLE IF NOT EXISTS summary (
+      sourceId          TEXT NOT NULL,
+      sessionId         TEXT NOT NULL,
+      backend           TEXT NOT NULL,
+      text              TEXT NOT NULL,
+      sessionUpdatedAt  TEXT NOT NULL,
+      createdAt         TEXT NOT NULL,
+      PRIMARY KEY (sourceId, sessionId, backend)
+    );
   `);
 }
 
@@ -208,6 +218,38 @@ export const sessionsRepo = {
       .prepare<unknown[], SessionRow>(`SELECT * FROM session WHERE sourceId = ? AND sessionId = ?`)
       .get(sourceId, sessionId);
     return r ? rowToSession(r) : null;
+  },
+};
+
+export interface SummaryRow {
+  sourceId: string;
+  sessionId: string;
+  backend: string;
+  text: string;
+  sessionUpdatedAt: string;
+  createdAt: string;
+}
+
+export const summariesRepo = {
+  get(sourceId: string, sessionId: string, backend: string): SummaryRow | null {
+    const r = getDb()
+      .prepare<unknown[], SummaryRow>(
+        `SELECT * FROM summary WHERE sourceId = ? AND sessionId = ? AND backend = ?`,
+      )
+      .get(sourceId, sessionId, backend);
+    return r ?? null;
+  },
+  upsert(row: SummaryRow): void {
+    getDb()
+      .prepare(
+        `INSERT INTO summary(sourceId,sessionId,backend,text,sessionUpdatedAt,createdAt)
+         VALUES (@sourceId,@sessionId,@backend,@text,@sessionUpdatedAt,@createdAt)
+         ON CONFLICT(sourceId,sessionId,backend) DO UPDATE SET
+           text=excluded.text,
+           sessionUpdatedAt=excluded.sessionUpdatedAt,
+           createdAt=excluded.createdAt`,
+      )
+      .run(row);
   },
 };
 

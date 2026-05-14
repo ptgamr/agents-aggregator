@@ -2,10 +2,12 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
-import { sessionsRepo, sourcesRepo } from './db';
+import { sessionsRepo, sourcesRepo, summariesRepo } from './db';
 import { parserFor } from './parsers';
 import { subscribe } from './pubsub';
 import { resolveTargetForSession, sendInput } from './tmux';
+import { distill } from './distill';
+import { summarize, type Backend } from './summarize';
 import { log } from './logger';
 import type { AgentType } from '../shared/types';
 
@@ -152,6 +154,92 @@ app.post('/api/sessions/:sourceId/:sessionId/input', async (c) => {
     return c.json({ error: 'send failed', detail: (e as Error).message }, 500);
   }
   return c.json({ ok: true, target: resolved.target });
+});
+
+app.get('/api/sessions/:sourceId/:sessionId/summary', async (c) => {
+  const sourceId = c.req.param('sourceId');
+  const sessionId = c.req.param('sessionId');
+  const url = new URL(c.req.url);
+  const backendParam = url.searchParams.get('backend');
+  const backend: Backend = backendParam === 'codex' ? 'codex' : 'claude';
+  const force = url.searchParams.get('force') === '1';
+
+  const session = sessionsRepo.find(sourceId, sessionId);
+  if (!session) return c.json({ error: 'session not found' }, 404);
+  const sources = sourcesRepo.list();
+  const src = sources.find((s) => s.id === sourceId);
+  if (!src) return c.json({ error: 'source missing' }, 404);
+  const parser = parserFor(src.agent);
+  if (!parser) return c.json({ error: 'no parser' }, 501);
+
+  // Cache hit: serve the stored summary if the session hasn't changed since
+  // it was generated. Otherwise (or with ?force=1) regenerate.
+  const cached = summariesRepo.get(sourceId, sessionId, backend);
+  const cacheFresh = cached && cached.sessionUpdatedAt === session.updatedAt;
+
+  return streamSSE(c, async (stream) => {
+    const ac = new AbortController();
+    c.req.raw.signal.addEventListener('abort', () => ac.abort(), { once: true });
+
+    if (cached && cacheFresh && !force) {
+      await stream.writeSSE({
+        event: 'meta',
+        data: JSON.stringify({ backend, cached: true, createdAt: cached.createdAt }),
+      });
+      await stream.writeSSE({
+        event: 'chunk',
+        data: JSON.stringify({ type: 'chunk', text: cached.text }),
+      });
+      await stream.writeSSE({ event: 'done', data: JSON.stringify({ type: 'done' }) });
+      return;
+    }
+
+    const entries = await parser.parseEntries(session.filePath);
+    const distilled = distill(entries);
+    await stream.writeSSE({
+      event: 'meta',
+      data: JSON.stringify({
+        backend, cached: false,
+        distilledChars: distilled.length, entryCount: entries.length,
+        stale: cached ? true : undefined,
+      }),
+    });
+
+    // If we have a stale cached summary, surface it first so the user sees
+    // *something* while the fresh generation runs.
+    if (cached && !cacheFresh && !force) {
+      await stream.writeSSE({
+        event: 'stale',
+        data: JSON.stringify({ type: 'stale', text: cached.text, createdAt: cached.createdAt }),
+      });
+    }
+
+    let accumulated = '';
+    try {
+      for await (const chunk of summarize(backend, distilled, ac.signal)) {
+        await stream.writeSSE({ event: chunk.type, data: JSON.stringify(chunk) });
+        if (chunk.type === 'chunk' && chunk.text) accumulated += chunk.text;
+        if (chunk.type === 'done') {
+          if (accumulated.trim()) {
+            summariesRepo.upsert({
+              sourceId, sessionId, backend,
+              text: accumulated,
+              sessionUpdatedAt: session.updatedAt,
+              createdAt: new Date().toISOString(),
+            });
+          }
+          break;
+        }
+        if (chunk.type === 'error') break;
+      }
+    } catch (err) {
+      log.error({ err, backend, sourceId, sessionId }, 'summary stream failed');
+      await stream.writeSSE({
+        event: 'error',
+        data: JSON.stringify({ type: 'error', detail: (err as Error).message }),
+      });
+    }
+  });
 });
 
 app.get('/api/events', (c) => {
