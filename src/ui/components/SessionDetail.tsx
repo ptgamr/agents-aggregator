@@ -19,10 +19,11 @@ interface SessionDetailProps {
   entries: Entry[];
   selectedEntryId: string | undefined;
   setSelectedEntryId: (id: string) => void;
+  loading?: boolean;
 }
 
 export function SessionDetail({
-  theme, treatment, dense, loud, shape, session, sources, entries, selectedEntryId, setSelectedEntryId,
+  theme, treatment, dense, loud, shape, session, sources, entries, selectedEntryId, setSelectedEntryId, loading,
 }: SessionDetailProps) {
   const t = themes[theme];
   const scrollRef = useRef<HTMLDivElement | null>(null);
@@ -91,6 +92,9 @@ export function SessionDetail({
       </div>
 
       <div ref={scrollRef} style={{ flex: 1, overflow: 'auto', padding: shape === 'timeline' ? '0' : '6px 22px 20px' }}>
+        {loading && entries.length === 0 && (
+          <div style={{ padding: 24, color: t.dim, fontSize: 12, fontFamily: monoFont }}>loading entries…</div>
+        )}
         {shape === 'timeline' ? (
           <TimelineView theme={theme} entries={entries}
                         selectedEntryId={selectedEntryId}

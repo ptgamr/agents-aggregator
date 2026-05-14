@@ -36,6 +36,17 @@ export type EntryRole =
   | 'summary'
   | 'custom';
 
+/** Composite session id used in URLs and React keys: `<sourceId>:<sessionId>`. */
+export const SESSION_ID_SEP = ':';
+export function composeSessionId(sourceId: string, sessionId: string): string {
+  return `${sourceId}${SESSION_ID_SEP}${sessionId}`;
+}
+export function splitSessionId(id: string): { sourceId: string; sessionId: string } | null {
+  const i = id.indexOf(SESSION_ID_SEP);
+  if (i < 0) return null;
+  return { sourceId: id.slice(0, i), sessionId: id.slice(i + 1) };
+}
+
 export interface Entry {
   id: string;
   role: EntryRole;
