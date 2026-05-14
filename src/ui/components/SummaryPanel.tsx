@@ -17,7 +17,7 @@ interface SummaryMeta {
 interface SummaryPanelProps {
   theme: ThemeMode;
   sessionId: string;
-  onClose: () => void;
+  onClose?: () => void;
 }
 
 export function SummaryPanel({ theme, sessionId, onClose }: SummaryPanelProps) {
@@ -145,16 +145,18 @@ export function SummaryPanel({ theme, sessionId, onClose }: SummaryPanelProps) {
             title="Regenerate, ignoring cache"
           >Regenerate</button>
         )}
-        <button
-          onClick={onClose}
-          style={{
-            marginLeft: 'auto',
-            background: 'transparent', border: 'none', color: t.dim,
-            fontSize: 16, cursor: 'pointer', padding: '0 4px',
-          }}
-          aria-label="Close summary"
-          title="Close"
-        >×</button>
+        {onClose && (
+          <button
+            onClick={onClose}
+            style={{
+              marginLeft: 'auto',
+              background: 'transparent', border: 'none', color: t.dim,
+              fontSize: 16, cursor: 'pointer', padding: '0 4px',
+            }}
+            aria-label="Close summary"
+            title="Close"
+          >×</button>
+        )}
       </div>
 
       <div style={{ padding: '12px 16px', maxHeight: 480, overflow: 'auto' }}>

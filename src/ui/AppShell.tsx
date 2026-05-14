@@ -306,7 +306,7 @@ export function AppShell() {
         <div style={{ flex: 1, minHeight: 0, display: 'flex' }}>
           <SessionDetail
             theme={tw.theme} treatment={tw.agentTreatment} dense={dense}
-            loud={tw.liveLoud} readerMode={tw.readerMode}
+            loud={tw.liveLoud}
             session={focusedSession} sources={sources} entries={entries}
             selectedEntryId={selectedEntry?.id}
             setSelectedEntryId={setSelectedEntryId}
@@ -354,7 +354,7 @@ export function AppShell() {
           {(bp !== 'sm' || activeId) && (
             <SessionDetail
               theme={tw.theme} treatment={tw.agentTreatment} dense={dense}
-              loud={tw.liveLoud} readerMode={tw.readerMode}
+              loud={tw.liveLoud}
               session={focusedSession} sources={sources} entries={entries}
               selectedEntryId={selectedEntry?.id}
               setSelectedEntryId={setSelectedEntryId}
@@ -384,10 +384,6 @@ export function AppShell() {
         <TweakSection label="Live activity" />
         <TweakToggle label="Loud (glow + highlight)" value={tw.liveLoud}
                      onChange={(v) => setTw('liveLoud', v)} />
-
-        <TweakSection label="Transcript" />
-        <TweakToggle label="Reader mode (hide tool calls)" value={tw.readerMode}
-                     onChange={(v) => setTw('readerMode', v)} />
       </TweaksPanel>
     </div>
     </FilePreviewProvider>

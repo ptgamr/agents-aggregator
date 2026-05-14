@@ -96,7 +96,6 @@ export interface Tweaks {
   density: Density;
   agentTreatment: AgentTreatment;
   liveLoud: boolean;
-  readerMode: boolean;
 }
 
 export const TWEAK_DEFAULTS: Tweaks = {
@@ -104,5 +103,4 @@ export const TWEAK_DEFAULTS: Tweaks = {
   density: 'compact',
   agentTreatment: 'chip',
   liveLoud: true,
-  readerMode: false,
 };

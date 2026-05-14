@@ -12,14 +12,13 @@ import {
   type AgentTreatment, type Theme, type ThemeMode,
 } from '../theme';
 
+type ViewMode = 'chat' | 'reader';
+
 interface SessionDetailProps {
   theme: ThemeMode;
   treatment: AgentTreatment;
   dense: boolean;
   loud: boolean;
-  /** Reader mode: hide tool calls, tool results, bash, and thinking entries
-   *  — leaving just user/assistant prose. */
-  readerMode: boolean;
   session: Session | undefined;
   sources: Source[];
   entries: Entry[];
@@ -38,31 +37,27 @@ interface SessionDetailProps {
 }
 
 export function SessionDetail({
-  theme, treatment, dense, loud, readerMode, session, sources, entries, selectedEntryId, setSelectedEntryId, loading, onBack, blurred,
+  theme, treatment, dense, loud, session, sources, entries, selectedEntryId, setSelectedEntryId, loading, onBack, blurred,
   inTab, isPinned, onTogglePin, onOpenInTab, onBackHome,
 }: SessionDetailProps) {
   const t = themes[theme];
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const lastCountRef = useRef<number>(entries.length);
-  const [summaryOpen, setSummaryOpen] = useState<boolean>(false);
+  const [mode, setMode] = useState<ViewMode>('chat');
 
   useEffect(() => {
-    // Don't auto-scroll to bottom on new entries while the summary panel is open —
-    // it sits above the chat and we'd scroll the user away from it.
-    if (!summaryOpen && entries.length > lastCountRef.current && scrollRef.current) {
+    // Don't auto-scroll to bottom on new entries in reader mode — the summary
+    // sits above the chat and we'd scroll the user away from it.
+    if (mode === 'chat' && entries.length > lastCountRef.current && scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
     lastCountRef.current = entries.length;
-  }, [entries.length, summaryOpen]);
+  }, [entries.length, mode]);
 
-  // Bring the summary panel into view when it opens (it's anchored to the top of the scroll area).
+  // Bring the summary into view when switching into reader mode.
   useEffect(() => {
-    if (summaryOpen && scrollRef.current) scrollRef.current.scrollTop = 0;
-  }, [summaryOpen]);
-
-  // Close the summary panel on session change — the open panel and its content
-  // belong to whichever session was focused when it was opened.
-  useEffect(() => { setSummaryOpen(false); }, [session?.id]);
+    if (mode === 'reader' && scrollRef.current) scrollRef.current.scrollTop = 0;
+  }, [mode]);
 
   if (!session) return <div style={{ background: t.bg }} />;
 
@@ -115,11 +110,6 @@ export function SessionDetail({
                   )}
                 </>
               )}
-              <button
-                onClick={() => setSummaryOpen((v) => !v)}
-                style={headerBtnStyle(t, summaryOpen)}
-                title="Summarize this session"
-              >Summarize</button>
               <button style={headerBtnStyle(t)}>fork</button>
               <button style={headerBtnStyle(t)}>share</button>
               <button style={headerBtnStyle(t)}>⋯</button>
@@ -145,6 +135,18 @@ export function SessionDetail({
         </div>
       </div>
 
+      <div style={{
+        display: 'flex', gap: 2, padding: `0 ${pad}px`,
+        borderBottom: `1px solid ${t.border}`,
+      }}>
+        <div style={innerWrapStyle}>
+          <div style={{ display: 'flex', gap: 2 }}>
+            <TabButton theme={theme} active={mode === 'chat'} onClick={() => setMode('chat')}>Chat</TabButton>
+            <TabButton theme={theme} active={mode === 'reader'} onClick={() => setMode('reader')}>Reader mode</TabButton>
+          </div>
+        </div>
+      </div>
+
       <div
         ref={scrollRef}
         style={{
@@ -155,20 +157,40 @@ export function SessionDetail({
         }}
       >
         <div style={innerWrapStyle}>
-          {summaryOpen && (
-            <SummaryPanel theme={theme} sessionId={session.id} onClose={() => setSummaryOpen(false)} />
+          {mode === 'reader' && (
+            <SummaryPanel key={session.id} theme={theme} sessionId={session.id} />
           )}
           {loading && entries.length === 0 && (
             <div style={{ padding: 24, color: t.dim, fontSize: 13, fontFamily: monoFont }}>loading entries…</div>
           )}
           <ChatView theme={theme} treatment={treatment} dense={dense}
-                    entries={entries} session={session} readerMode={readerMode}
+                    entries={entries} session={session} readerMode={mode === 'reader'}
                     selectedEntryId={selectedEntryId} setSelectedEntryId={setSelectedEntryId} />
         </div>
       </div>
 
       {session.live && <SendBox theme={theme} session={session} pad={pad} innerWrapStyle={innerWrapStyle} />}
     </div>
+  );
+}
+
+interface TabButtonProps {
+  theme: ThemeMode;
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}
+function TabButton({ theme, active, onClick, children }: TabButtonProps) {
+  const t = themes[theme];
+  return (
+    <button onClick={onClick} style={{
+      padding: '8px 14px', fontSize: 12, fontFamily: monoFont,
+      background: 'transparent', border: 'none',
+      color: active ? t.fg : t.dim,
+      borderBottom: active ? `2px solid ${t.accent}` : '2px solid transparent',
+      marginBottom: -1, cursor: 'pointer',
+      letterSpacing: '0.01em',
+    }}>{children}</button>
   );
 }
 
