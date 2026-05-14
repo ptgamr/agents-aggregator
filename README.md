@@ -63,6 +63,21 @@ Or Watch me building it in realtime: https://www.youtube.com/watch?v=ACWjW-3LFS0
 - **Per-file tailing** with debounced `fs.watch`, byte-offset tracking, and
   truncation detection.
 
+## Keyboard shortcuts
+
+| Shortcut       | Action                                                  |
+|----------------|---------------------------------------------------------|
+| `⌘1` / `Ctrl+1`| Switch to the **Home** tab                              |
+| `⌘2` … `⌘9`    | Switch to the pinned session tab at that index          |
+| `⌘W` / `Ctrl+W`| On a session tab: unpin it and return to **Home**       |
+| `⌘⇧P` / `Ctrl+Shift+P` | Toggle pin on the focused session              |
+| `⌘/Ctrl + Enter` | In the send box: deliver the message to the live pane |
+
+Shortcuts are ignored while an input or textarea has focus, so typing in
+search or the send box won't trigger them. On Windows / Linux, use `Ctrl`
+in place of `⌘`. Browsers may intercept `⌘W` before the app sees it
+(closing the page); on those browsers, click the tab's `×` instead.
+
 ## Running multiple profiles
 
 Both Claude Code and Codex respect an env var that points at their home
