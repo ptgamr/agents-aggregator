@@ -131,7 +131,8 @@ export function AppShell() {
 
   // ── Journal state ───────────────────────────────────────────────────────
   const journal = useJournal();
-  const [proposalsBySession, setProposalsBySession] = useState<Record<string, JournalProposal[]>>({});
+  interface ProposalsState { proposals: JournalProposal[]; open: boolean; }
+  const [proposalsBySession, setProposalsBySession] = useState<Record<string, ProposalsState>>({});
   const [journalProjectKey, setJournalProjectKey] = useState<string | null>(null);
   const [toast, setToast] = useState<ToastState | null>(null);
 
@@ -240,8 +241,9 @@ export function AppShell() {
     });
   }, [journal, jumpToJournal]);
 
+  /** Set proposals + auto-open the floating panel (fresh model results). */
   const setProposalsFor = useCallback((sessionId: string, proposals: JournalProposal[]) => {
-    setProposalsBySession((prev) => ({ ...prev, [sessionId]: proposals }));
+    setProposalsBySession((prev) => ({ ...prev, [sessionId]: { proposals, open: true } }));
   }, []);
   const clearProposalsFor = useCallback((sessionId: string) => {
     setProposalsBySession((prev) => {
@@ -250,17 +252,25 @@ export function AppShell() {
       return rest;
     });
   }, []);
+  /** Toggle the floating panel without dropping the cached proposals. */
+  const toggleProposalsPanel = useCallback((sessionId: string) => {
+    setProposalsBySession((prev) => {
+      const cur = prev[sessionId];
+      if (!cur) return prev;
+      return { ...prev, [sessionId]: { ...cur, open: !cur.open } };
+    });
+  }, []);
   const acceptProposal = useCallback((sessionId: string, p: JournalProposal) => {
     journal.add(p);
     setProposalsBySession((prev) => {
       const cur = prev[sessionId];
       if (!cur) return prev;
-      const next = cur.filter((x) => x !== p);
+      const next = cur.proposals.filter((x) => x !== p);
       if (next.length === 0) {
         const { [sessionId]: _omit, ...rest } = prev;
         return rest;
       }
-      return { ...prev, [sessionId]: next };
+      return { ...prev, [sessionId]: { ...cur, proposals: next } };
     });
     setJournalProjectKey(p.projectKey);
   }, [journal]);
@@ -342,7 +352,9 @@ export function AppShell() {
   // Pick which session's proposals to show in the SessionDetail. On Home that's
   // the focused session; in a pinned tab it's the tab session.
   const detailSessionId = inSessionTab ? activeTab : (focusedSession?.id ?? null);
-  const detailProposals = detailSessionId ? proposalsBySession[detailSessionId] : undefined;
+  const detailProposalsState = detailSessionId ? proposalsBySession[detailSessionId] : undefined;
+  const detailProposals = detailProposalsState?.proposals;
+  const detailProposalsOpen = !!detailProposalsState?.open;
 
   return (
     <LightboxProvider>
@@ -428,6 +440,8 @@ export function AppShell() {
             onBackHome={goHomeTab}
             onCapture={focusedSession && tw.journalCapture ? (entry, kind, text) => handleCapture(entry, kind, focusedSession, text) : undefined}
             proposals={detailProposals}
+            proposalsOpen={detailProposalsOpen}
+            onToggleProposalsPanel={focusedSession ? () => toggleProposalsPanel(focusedSession.id) : undefined}
             onProposals={focusedSession ? (ps) => setProposalsFor(focusedSession.id, ps) : undefined}
             onAcceptProposal={focusedSession ? (p) => acceptProposal(focusedSession.id, p) : undefined}
             onAcceptAllProposals={focusedSession ? (ps) => acceptAllProposals(focusedSession.id, ps) : undefined}
@@ -483,6 +497,8 @@ export function AppShell() {
               onOpenInTab={() => focusedSession && openInTab(focusedSession.id)}
               onCapture={focusedSession && tw.journalCapture ? (entry, kind, text) => handleCapture(entry, kind, focusedSession, text) : undefined}
               proposals={detailProposals}
+              proposalsOpen={detailProposalsOpen}
+              onToggleProposalsPanel={focusedSession ? () => toggleProposalsPanel(focusedSession.id) : undefined}
               onProposals={focusedSession ? (ps) => setProposalsFor(focusedSession.id, ps) : undefined}
               onAcceptProposal={focusedSession ? (p) => acceptProposal(focusedSession.id, p) : undefined}
               onAcceptAllProposals={focusedSession ? (ps) => acceptAllProposals(focusedSession.id, ps) : undefined}

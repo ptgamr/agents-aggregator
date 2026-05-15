@@ -44,6 +44,11 @@ interface SessionDetailProps {
   onCapture?: (entry: Entry, kind: JournalKind, text?: string) => void;
   /** Proposals currently pending for this session (from `summarize → journal`). */
   proposals?: JournalProposal[];
+  /** When `true`, the floating proposals panel is visible. */
+  proposalsOpen?: boolean;
+  /** Click on the summarize button when proposals already exist toggles the
+   *  panel via this callback instead of re-running the model. */
+  onToggleProposalsPanel?: () => void;
   /** Called once the model returns parsed proposals. */
   onProposals?: (proposals: JournalProposal[]) => void;
   onAcceptProposal?: (p: JournalProposal) => void;
@@ -56,7 +61,9 @@ interface SessionDetailProps {
 export function SessionDetail({
   theme, treatment, dense, loud, session, sources, entries, selectedEntryId, setSelectedEntryId, loading, onBack, blurred,
   inTab, isPinned, onTogglePin, onOpenInTab, onBackHome,
-  onCapture, proposals, onProposals, onAcceptProposal, onAcceptAllProposals, onDismissProposals,
+  onCapture,
+  proposals, proposalsOpen, onToggleProposalsPanel,
+  onProposals, onAcceptProposal, onAcceptAllProposals, onDismissProposals,
   summarizeBackend,
 }: SessionDetailProps) {
   const t = themes[theme];
@@ -100,7 +107,7 @@ export function SessionDetail({
     : {};
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', minHeight: 0, minWidth: 0, background: t.bg, flex: 1 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', minHeight: 0, minWidth: 0, background: t.bg, flex: 1, position: 'relative' }}>
       <div style={{ padding: `${inTab ? 18 : 14}px ${pad}px`, borderBottom: `1px solid ${t.border}` }}>
         <div style={innerWrapStyle}>
           <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 6, flexWrap: 'wrap' }}>
@@ -144,6 +151,9 @@ export function SessionDetail({
                   theme={theme} session={session}
                   entries={entries} onProposals={onProposals}
                   backend={summarizeBackend}
+                  proposalsCount={proposals?.length ?? 0}
+                  panelOpen={!!proposalsOpen}
+                  onToggle={onToggleProposalsPanel}
                 />
               )}
               <button style={headerBtnStyle(t)}>fork</button>
@@ -220,15 +230,6 @@ export function SessionDetail({
           {loading && entries.length === 0 && (
             <div style={{ padding: 24, color: t.dim, fontSize: 13, fontFamily: monoFont }}>loading entries…</div>
           )}
-          {proposals && proposals.length > 0 && onAcceptProposal && onAcceptAllProposals && onDismissProposals && (
-            <ProposalSheet
-              theme={theme} proposals={proposals}
-              projectKey={session.cwd}
-              onAccept={onAcceptProposal}
-              onAcceptAll={onAcceptAllProposals}
-              onDismiss={onDismissProposals}
-            />
-          )}
           {/* Reader mode narrows just the transcript for comfortable line length;
               the summary block above stays at the full panel width. */}
           <div style={mode === 'reader'
@@ -248,6 +249,21 @@ export function SessionDetail({
         <SelectionCaptureToolbar
           theme={theme} entries={entries}
           onCapture={(entry, kind, text) => onCapture(entry, kind, text)}
+        />
+      )}
+
+      {proposalsOpen && proposals && proposals.length > 0
+        && onAcceptProposal && onAcceptAllProposals && onDismissProposals && (
+        <ProposalSheet
+          floating
+          // Sit above the SendBox when the session is live, otherwise hug bottom.
+          floatingBottom={session.live ? 92 : 20}
+          theme={theme} proposals={proposals}
+          projectKey={session.cwd}
+          onAccept={onAcceptProposal}
+          onAcceptAll={onAcceptAllProposals}
+          onDismiss={onDismissProposals}
+          onClose={onToggleProposalsPanel}
         />
       )}
     </div>

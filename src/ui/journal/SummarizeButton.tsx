@@ -15,9 +15,20 @@ interface SummarizeButtonProps {
   onProposals: (proposals: JournalProposal[]) => void;
   /** Which CLI to shell out to (see Tweaks → Summarization). Defaults to claude. */
   backend?: SummarizeBackend;
+  /** Number of cached proposals for this session. When > 0, the button click
+   *  toggles the floating panel instead of re-running the model. */
+  proposalsCount?: number;
+  /** Whether the floating panel is currently visible. Drives the toggle label. */
+  panelOpen?: boolean;
+  /** Toggle handler — called when there are existing proposals. */
+  onToggle?: () => void;
 }
 
-export function SummarizeButton({ theme, session, entries, onProposals, backend = 'claude' }: SummarizeButtonProps) {
+export function SummarizeButton({
+  theme, session, entries, onProposals, backend = 'claude',
+  proposalsCount = 0, panelOpen, onToggle,
+}: SummarizeButtonProps) {
+  const hasProposals = proposalsCount > 0;
   const t = themes[theme];
   const [loading, setLoading] = useState(false);
 
@@ -94,15 +105,20 @@ Rules:
   };
 
   const model = backendModelLabel(backend);
+  const handleClick = hasProposals && onToggle ? onToggle : run;
+  const title = hasProposals
+    ? (panelOpen ? 'Hide proposal panel' : 'Show proposal panel')
+    : `Summarize last 20 entries with ${model} (change in Tweaks → Summarization)`;
   return (
     <button
-      onClick={run}
+      onClick={handleClick}
       disabled={loading}
-      title={`Summarize last 20 entries with ${model} (change in Tweaks → Summarization)`}
+      title={title}
       style={{
         display: 'inline-flex', alignItems: 'center', gap: 5,
         padding: '4px 8px', borderRadius: 4,
-        background: t.panel, border: `1px solid ${t.border}`,
+        background: panelOpen ? t.panel2 : t.panel,
+        border: `1px solid ${panelOpen ? t.amber + '88' : t.border}`,
         color: loading ? t.dim2 : t.fg2,
         fontFamily: monoFont, fontSize: 11,
         cursor: loading ? 'default' : 'pointer',
@@ -110,8 +126,14 @@ Rules:
       }}
     >
       <span style={{ color: t.amber, fontSize: 10 }}>◆</span>
-      {loading ? `summarizing via ${backend}…` : 'summarize → journal'}
-      <span style={{ color: t.dim2, fontSize: 10 }}>· {model}</span>
+      {loading
+        ? `summarizing via ${backend}…`
+        : hasProposals
+          ? (panelOpen ? 'hide proposals' : 'show proposals')
+          : 'summarize → journal'}
+      <span style={{ color: t.dim2, fontSize: 10 }}>
+        · {hasProposals ? `${proposalsCount}` : model}
+      </span>
     </button>
   );
 }
