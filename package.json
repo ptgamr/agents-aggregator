@@ -24,10 +24,13 @@
     "build": "npm run build:ui && npm run build:server",
     "prepare": "npm run build",
     "preview": "vite preview",
-    "cli": "tsx src/server/cli.ts"
+    "cli": "tsx src/server/cli.ts",
+    "tui": "bun src/server/cli.ts tui"
   },
   "dependencies": {
     "@hono/node-server": "^1.13.7",
+    "@opentui/core": "^0.2.10",
+    "@opentui/react": "^0.2.10",
     "@pierre/diffs": "^1.1.22",
     "@tanstack/react-router": "^1.169.2",
     "@types/react-syntax-highlighter": "^15.5.13",
@@ -36,18 +39,19 @@
     "hono": "^4.6.12",
     "pino": "^9.5.0",
     "pino-pretty": "^11.3.0",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6",
     "react-markdown": "^10.1.0",
     "react-syntax-highlighter": "^16.1.1",
     "remark-gfm": "^4.0.1",
+    "web-tree-sitter": "^0.25.10",
     "zod": "^3.23.8"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.12",
     "@types/node": "^22.10.1",
-    "@types/react": "^18.3.12",
-    "@types/react-dom": "^18.3.1",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^4.3.4",
     "concurrently": "^9.1.0",
     "esbuild": "^0.24.2",
