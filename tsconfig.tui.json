@@ -9,6 +9,8 @@
     "isolatedModules": true,
     "moduleDetection": "force",
     "noEmit": true,
+    "jsx": "react-jsx",
+    "jsxImportSource": "@opentui/react",
     "strict": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
@@ -16,9 +18,7 @@
     "noUncheckedSideEffectImports": true,
     "esModuleInterop": true,
     "resolveJsonModule": true,
-    "jsx": "react-jsx",
-    "jsxImportSource": "@opentui/react",
     "types": ["node", "better-sqlite3"]
   },
-  "include": ["src/server", "src/shared"]
+  "include": ["src/tui", "src/server", "src/shared"]
 }

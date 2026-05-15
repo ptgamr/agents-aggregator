@@ -66,6 +66,62 @@ program
     process.on('SIGTERM', shutdown);
   });
 
+// --- tui -----------------------------------------------------------------
+
+program
+  .command('tui')
+  .description('Launch the terminal UI (lazygit-style)')
+  .action(async () => {
+    // OpenTUI requires Bun (uses bun-ffi). If we're not under Bun, re-exec
+    // ourselves under bun so the user can run `agents-agg tui` regardless.
+    const isBun = typeof (globalThis as { Bun?: unknown }).Bun !== 'undefined';
+    if (!isBun) {
+      await reExecUnderBun();
+      return;
+    }
+    const { runTui } = await import('../tui/run');
+    await runTui();
+  });
+
+async function reExecUnderBun(): Promise<void> {
+  const { spawn } = await import('node:child_process');
+  const bunPath = await resolveBun();
+  if (!bunPath) {
+    console.error(
+      'agents-agg tui requires Bun (opentui uses FFI not available in Node).\n' +
+        'Install: curl -fsSL https://bun.sh/install | bash',
+    );
+    process.exit(2);
+  }
+  // Spawn bun with the same script path. The .ts entry works directly.
+  const here = path.dirname(fileURLToPath(import.meta.url));
+  const tsCli = path.resolve(here, 'cli.ts');
+  const jsCli = path.resolve(here, 'cli.js');
+  const entry = existsSync(tsCli) ? tsCli : jsCli;
+  const child = spawn(bunPath, [entry, 'tui'], { stdio: 'inherit' });
+  child.on('exit', (code) => process.exit(code ?? 0));
+}
+
+async function resolveBun(): Promise<string | null> {
+  const { existsSync } = await import('node:fs');
+  const bunExe = process.platform === 'win32' ? 'bun.exe' : 'bun';
+  const candidates = [
+    process.env.BUN ?? '',
+    `${process.env.HOME ?? ''}/.bun/bin/bun`,
+    '/usr/local/bin/bun',
+    '/opt/homebrew/bin/bun',
+  ].filter(Boolean);
+  for (const c of candidates) {
+    if (existsSync(c)) return c;
+  }
+  for (const dir of (process.env.PATH ?? '').split(path.delimiter)) {
+    if (!dir) continue;
+    const candidate = path.join(dir, bunExe);
+    if (existsSync(candidate)) return candidate;
+  }
+  return null;
+}
+
 // --- source --------------------------------------------------------------
 
 const source = program.command('source').description('Manage sources');

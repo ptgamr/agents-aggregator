@@ -1,0 +1,47 @@
+import { SyntaxStyle } from '@opentui/core';
+
+export function createTuiSyntaxStyle(): SyntaxStyle {
+  return SyntaxStyle.fromStyles({
+    default: { fg: '#d4d4d8' },
+    comment: { fg: '#71717a', italic: true },
+    punctuation: { fg: '#71717a' },
+    operator: { fg: '#fda4af' },
+    keyword: { fg: '#93c5fd', bold: true },
+    function: { fg: '#facc15' },
+    variable: { fg: '#e5e7eb' },
+    property: { fg: '#67e8f9' },
+    type: { fg: '#c4b5fd' },
+    constant: { fg: '#f0abfc' },
+    number: { fg: '#f0abfc' },
+    string: { fg: '#a7f3d0' },
+    label: { fg: '#22d3ee', bold: true },
+    conceal: { fg: '#52525b' },
+
+    'character.special': { fg: '#fbbf24' },
+    'keyword.directive': { fg: '#f472b6', bold: true },
+    'punctuation.special': { fg: '#71717a' },
+    'punctuation.delimiter': { fg: '#71717a' },
+    'string.escape': { fg: '#fbbf24' },
+
+    markup: { fg: '#d4d4d8' },
+    'markup.heading': { fg: '#7dd3fc', bold: true },
+    'markup.heading.1': { fg: '#38bdf8', bold: true },
+    'markup.heading.2': { fg: '#60a5fa', bold: true },
+    'markup.heading.3': { fg: '#818cf8', bold: true },
+    'markup.heading.4': { fg: '#a78bfa', bold: true },
+    'markup.heading.5': { fg: '#c084fc', bold: true },
+    'markup.heading.6': { fg: '#e879f9', bold: true },
+    'markup.strong': { fg: '#f8fafc', bold: true },
+    'markup.italic': { fg: '#c4b5fd', italic: true },
+    'markup.strikethrough': { fg: '#94a3b8', dim: true },
+    'markup.raw': { fg: '#facc15' },
+    'markup.raw.block': { fg: '#d1d5db' },
+    'markup.link': { fg: '#38bdf8' },
+    'markup.link.label': { fg: '#93c5fd', underline: true },
+    'markup.link.url': { fg: '#22d3ee', underline: true },
+    'markup.list': { fg: '#f59e0b', bold: true },
+    'markup.list.checked': { fg: '#10b981', bold: true },
+    'markup.list.unchecked': { fg: '#f59e0b' },
+    'markup.quote': { fg: '#94a3b8', italic: true },
+  });
+}
