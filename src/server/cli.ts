@@ -8,7 +8,7 @@ import type { AgentType } from '../shared/types';
 
 const program = new Command();
 program
-  .name('agents-agg')
+  .name('agents-aggregator')
   .description('Agents Aggregator — aggregate AI coding-agent session history')
   .option('-c, --config <path>', 'Path to config.json (default: ~/.config/agents-aggregator/config.json)')
   .hook('preAction', (thisCmd) => {
@@ -108,7 +108,7 @@ source
     const { loadConfig } = await import('./config');
     const cfg = loadConfig();
     if (cfg.sources.length === 0) {
-      console.log('No sources configured. Try: agents-agg source add ~/.claude');
+      console.log('No sources configured. Try: agents-aggregator source add ~/.claude');
       return;
     }
     for (const s of cfg.sources) {

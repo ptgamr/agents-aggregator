@@ -4,7 +4,7 @@
   "private": false,
   "type": "module",
   "bin": {
-    "agents-agg": "dist/server/cli.js"
+    "agents-aggregator": "dist/server/cli.js"
   },
   "files": [
     "dist",

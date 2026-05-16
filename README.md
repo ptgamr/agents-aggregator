@@ -112,10 +112,10 @@ alias claude-two="CLAUDE_CONFIG_DIR=~/.claude-two claude"
 Then add each directory as a source:
 
 ```bash
-agents-agg source add ~/.claude-one --label "Claude (personal)"
-agents-agg source add ~/.claude-two --label "Claude (work)"
-agents-agg source add ~/.codex-one  --label "Codex (personal)"
-agents-agg source add ~/.codex-two  --label "Codex (work)"
+agents-aggregator source add ~/.claude-one --label "Claude (personal)"
+agents-aggregator source add ~/.claude-two --label "Claude (work)"
+agents-aggregator source add ~/.codex-one  --label "Codex (personal)"
+agents-aggregator source add ~/.codex-two  --label "Codex (work)"
 ```
 
 ## Requirements
@@ -144,8 +144,8 @@ You can also install it once:
 
 ```bash
 npm install -g github:ptgamr/agents-aggregator
-agents-agg source add ~/.claude
-agents-agg serve
+agents-aggregator source add ~/.claude
+agents-aggregator serve
 ```
 
 ### Develop locally
@@ -185,13 +185,13 @@ You can hand-edit this file or manage it via the CLI.
 ## CLI
 
 ```bash
-agents-agg [--config <path>] serve [--port <n>] [--no-ui]
-agents-agg [--config <path>] source add <root> [--label <label>] [--agent <agent>] [--id <id>]
-agents-agg [--config <path>] source list
-agents-agg [--config <path>] source remove <id>
-agents-agg [--config <path>] source enable <id>
-agents-agg [--config <path>] source disable <id>
-agents-agg [--config <path>] scan          # re-index all enabled sources
+agents-aggregator [--config <path>] serve [--port <n>] [--no-ui]
+agents-aggregator [--config <path>] source add <root> [--label <label>] [--agent <agent>] [--id <id>]
+agents-aggregator [--config <path>] source list
+agents-aggregator [--config <path>] source remove <id>
+agents-aggregator [--config <path>] source enable <id>
+agents-aggregator [--config <path>] source disable <id>
+agents-aggregator [--config <path>] scan          # re-index all enabled sources
 ```
 
 `<agent>` is one of `claude`, `codex`, `opencode`, `pi`. Omit it to auto-detect
@@ -199,7 +199,7 @@ from the folder layout. `--config` accepts a path to a `config.json`; the SQLite
 index is created alongside it. If omitted, the default
 `~/.config/agents-aggregator/config.json` is used.
 
-During local development you can replace `agents-agg` with
+During local development you can replace `agents-aggregator` with
 `npm run cli --` to run the TypeScript sources directly via `tsx`.
 
 
