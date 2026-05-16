@@ -40,16 +40,30 @@ not vulnerable to MemPalace parser changes.
 ```
 ~/.config/agents-aggregator/
   mempalace-stage/
-    <sourceId>/
-      <sessionId>.md
+    <sourceId>__<sessionId>.md
 ```
 
-One file per session, overwritten on update. Idempotent — re-mine the
-same path and MemPalace updates that document's chunks. Search hits
-encode `(sourceId, sessionId)` in the filename, so no sidecar lookup
-table.
+Flat dir, composite filename. `mempalace search` surfaces only the
+basename in output, so we embed identity in the name: parse
+`<sourceId>__<sessionId>.md` → `(sourceId, sessionId)` directly. The
+double underscore is a safe separator (slugs are kebab-case).
 
-`agents-aggregator memory rescan` wipes the stage dir and rebuilds from SQLite.
+**Update flow is delete-then-mine, not re-mine.** The convo miner
+explicitly assumes transcripts are immutable — `file_already_mined()`
+returns true for any file already in the palace, regardless of content
+change. So a live session update requires:
+
+1. Delete the stage file
+2. `mempalace sync <stage-dir> --apply` (prunes the orphaned drawers)
+3. Write the new content to the same path
+4. `mempalace mine <stage-dir> --mode convos --wing <slug>` (sees a
+   "new" file)
+
+Three subprocess invocations per update. Acceptable inside our 30s
+debounce.
+
+`agents-aggregator memory rescan` wipes the stage dir, runs sync, and
+rebuilds from SQLite.
 
 ## Module layout
 
@@ -69,27 +83,24 @@ New SQLite table: `wing` — `(slug PRIMARY KEY, cwd, lastMinedAt)`.
 
 ## Markdown format
 
-```markdown
----
-sessionId: 0d3f...
-sourceId: claude-work
-agent: claude
-cwd: /home/anh/work/orion
-startedAt: 2026-05-15T09:32:01Z
-updatedAt: 2026-05-16T11:04:55Z
----
+**No YAML frontmatter.** Verified during spike: frontmatter gets
+chunked as a low-signal drawer and pollutes search. All identity lives
+in the filename.
 
-## User
-{text}
+MemPalace's convo chunker uses `>` (Markdown blockquote) for the user
+turn; the AI response is unprefixed lines until the next `>` or `---`:
 
-## Assistant
-{text}
+```
+> [User] {user text}
+{assistant text — can span multiple lines}
 
 ### Tool: Read /src/app.ts
 {preview, truncated to ~500 chars}
 
-## Assistant
-{more text}
+{more assistant text after the tool}
+
+> [User] {next user message}
+{next assistant response}
 
 ## Bash
 $ pnpm test
@@ -100,19 +111,20 @@ Role mapping:
 
 | `Entry.role` | Render as |
 |---|---|
-| `user` | `## User` block |
-| `assistant` | `## Assistant` block |
-| `toolCall` + `toolResult` | `### Tool: <name> <args>` + truncated body, folded into preceding assistant turn |
-| `bash` | `## Bash` with command + truncated output |
+| `user` | `> [User] <text>` quote line |
+| `assistant` | Unprefixed paragraphs after the user line |
+| `toolCall` + `toolResult` | `### Tool: <name> <args>` + truncated body, folded into the preceding assistant block |
+| `bash` | `## Bash` block with command + truncated output |
 | `thinking` | **drop** — hurts retrieval signal |
 | `system`, `summary`, `custom` | drop, or fold as minor section if obviously useful |
+
+The `[User]` prefix on the quote line is a sentinel that makes the
+exchange-pair chunker's output readable in search results. MemPalace's
+chunker triggers on `>` alone, but the prefix gives nicer snippets.
 
 Tool / bash output truncation: > ~2KB → first 500 chars +
 `[…truncated…]`. The viewer still has the raw payload in SQLite/files;
 the palace only needs enough to *retrieve* on.
-
-The frontmatter is belt-and-braces for identity recovery in case
-MemPalace surfaces YAML in hit metadata. Filename is the primary key.
 
 ## Wing strategy
 
@@ -154,34 +166,36 @@ MemPalace surfaces YAML in hit metadata. Filename is the primary key.
 
 1. Debounce 30s per `(sourceId, sessionId)`.
 2. Re-render the session from current entries.
-3. Atomic write to stage path.
-4. `mempalace mine <stage-path> --mode convos --wing <slug>`.
-5. Log success/failure through existing `logger.ts`.
+3. If a stale stage file exists at that path: delete it and run
+   `mempalace sync <stage-dir> --apply` to prune the orphaned drawers.
+4. Atomic write of the new render to the stage path.
+5. `mempalace mine <stage-dir> --mode convos --wing <slug>`.
+6. Log each step's success/failure through existing `logger.ts`.
 
 ### On `GET /api/search?q=…&limit=20`
 
-1. Spawn `mempalace search "<q>" --limit 20 [--json]`.
-2. Parse hits. Each hit ideally carries the file path → decode
-   `(sourceId, sessionId)`.
+1. Spawn `mempalace search "<q>" --results 20`. No `--json` flag
+   exists — parse the structured stdout.
+2. Per hit, the `Source: <basename>` line gives us
+   `<sourceId>__<sessionId>.md` → decode the composite filename.
 3. Look up session metadata from SQLite to enrich (label, cwd, agent,
    updatedAt).
-4. Return `[{ sourceId, sessionId, wing, snippet, score, sessionMeta }]`.
+4. Return `[{ sourceId, sessionId, wing, room, snippet, scores, sessionMeta }]`.
 
 UI work: search bar in `AppShell.tsx` (or a `/search` route in
 `router.tsx`), each hit deep-links into `SessionDetail`.
 
 ## Implementation order
 
-1. **Spike** (a few hours, no commits). Answer:
-   - What Markdown shape does `mempalace mine --mode convos`
-     recognize? Read `mempalace/convo_miner.py` /
-     `convo_scanner.py`.
-   - Does `mempalace search` have `--json`? If not, parse stdout, or
-     use MCP server over stdio.
-   - Does a hit carry the source file path (so we can decode IDs from
-     filename)? If not, we need a sidecar map.
-   - Cost of re-mining a single ~10MB session file: tens of ms or
-     several seconds? Determines whether 30s debounce is enough.
+1. ~~**Spike**~~ — done. Findings:
+   - Markdown convos = `>` quote for user, unprefixed text for AI.
+     Verified against MemPalace 3.3.5.
+   - `mempalace search` has **no** `--json`. Parse structured stdout.
+   - Search surfaces `Source: <basename>` only. Embed identity in the
+     filename: `<sourceId>__<sessionId>.md`.
+   - Convo miner assumes transcripts are immutable. Updates require
+     `delete + sync --apply + write + mine`.
+   - YAML frontmatter creates noise drawers — omit.
 2. **`detect.ts` + `render.ts` + CLI export command.** Manually verify
    the round-trip: export → mine → search → recover identity.
 3. **`wing.ts` + SQLite migration.** Idempotent slug assignment.
@@ -194,13 +208,16 @@ UI work: search bar in `AppShell.tsx` (or a `/search` route in
 
 ## Open questions
 
-- **Project mining cost on a large monorepo.** May need an
-  `--exclude node_modules` style flag or a per-source opt-out for
-  ingesting the project tree.
-- **Dedup with MemPalace's own hooks.** If the user has the MemPalace
-  Claude Code hooks installed *and* runs us with `--mempalace`, both
-  paths file the same session. MemPalace has `dedup.py` — verify it
-  works at the chunk level before declaring this safe.
+- **Project mining cost on a large monorepo.** `mempalace mine` on a
+  project dir scans every file. Big monorepo could be slow. Respects
+  `.gitignore` by default — usually enough. Per-source `mineProject`
+  opt-out flag is a likely follow-up.
+- **Palace init UX.** `mempalace init` is interactive without `--yes`
+  and `--no-llm` — we must shell out with both flags on first use, or
+  detect a fresh palace and instruct the user.
+- **Convo miner immutability assumption.** Documented above; works
+  around it via sync + remine. If MemPalace adds an `--force` flag
+  later, we collapse the three-step update to one.
 - **Multi-machine palaces.** A single `~/.mempalace/` is shared
   across users on the box; fine for single-user laptops, awkward
   later. Out of scope for v1.

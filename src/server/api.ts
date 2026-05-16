@@ -5,7 +5,7 @@ import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
 import { getMimeType } from 'hono/utils/mime';
 import { Readable } from 'node:stream';
-import { journalRepo, sessionsRepo, sourcesRepo, summariesRepo, type JournalItemRow } from './db';
+import { journalRepo, sessionsRepo, sourcesRepo, summariesRepo, wingsRepo, type JournalItemRow } from './db';
 import { parserFor } from './parsers';
 import { subscribe } from './pubsub';
 import { resolveTargetForSession, sendInput } from './tmux';
@@ -397,6 +397,76 @@ app.post('/api/journal/extract', async (c) => {
   } catch (err) {
     log.warn({ err, backend }, 'journal extract failed');
     return c.json({ error: 'extract failed', detail: (err as Error).message }, 500);
+  }
+});
+
+app.get('/api/memory/status', async (c) => {
+  const { detectMempalace } = await import('./memory/detect');
+  return c.json(detectMempalace());
+});
+
+app.get('/api/memory/projects', (c) => {
+  // Every unique cwd in the session table, enriched with the wing row
+  // (if the user has opted it into mempalace) and the current job state.
+  const projects = sessionsRepo.projects();
+  const wings = wingsRepo.list();
+  const wingByCwd = new Map(wings.map((w) => [w.cwd, w]));
+  const items = projects.map((p) => {
+    const w = wingByCwd.get(p.cwd);
+    return {
+      cwd: p.cwd,
+      sessionCount: p.count,
+      latestAt: p.latestAt,
+      slug: w?.slug ?? null,
+      status: w?.status ?? null,
+      lastMinedAt: w?.lastMinedAt ?? null,
+      lastMineError: w?.lastMineError ?? null,
+    };
+  });
+  return c.json({ projects: items });
+});
+
+app.get('/api/memory/jobs', async (c) => {
+  const { listJobs } = await import('./memory/jobs');
+  return c.json(listJobs());
+});
+
+app.post('/api/memory/projects', async (c) => {
+  const { addProject } = await import('./memory/jobs');
+  const body = await c.req.json().catch(() => ({}));
+  const cwd = typeof body.cwd === 'string' ? body.cwd : '';
+  if (!cwd) return c.json({ error: 'cwd required' }, 400);
+  const state = addProject(cwd);
+  return c.json({ job: state });
+});
+
+app.delete('/api/memory/projects/:slug', async (c) => {
+  const { removeProject } = await import('./memory/jobs');
+  const slug = c.req.param('slug');
+  if (!slug) return c.json({ error: 'slug required' }, 400);
+  try {
+    const r = await removeProject(slug);
+    if (!r.removed) return c.json({ error: 'not found' }, 404);
+    return c.json({ ok: true });
+  } catch (err) {
+    log.warn({ err, slug }, 'remove project failed');
+    return c.json({ error: 'remove failed', detail: (err as Error).message }, 500);
+  }
+});
+
+app.get('/api/search', async (c) => {
+  const url = new URL(c.req.url);
+  const q = url.searchParams.get('q')?.trim() ?? '';
+  const limit = Math.max(1, Math.min(50, Number(url.searchParams.get('limit') ?? '10')));
+  const wing = url.searchParams.get('wing') ?? undefined;
+  if (!q) return c.json({ hits: [], note: 'empty query' });
+  try {
+    const { searchPalace } = await import('./memory/search');
+    const hits = await searchPalace(q, { limit, wing });
+    return c.json({ hits });
+  } catch (err) {
+    log.warn({ err, q }, 'memory search failed');
+    return c.json({ error: 'memory search failed', detail: (err as Error).message }, 500);
   }
 });
 

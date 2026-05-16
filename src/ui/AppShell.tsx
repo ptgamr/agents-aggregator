@@ -29,6 +29,8 @@ import { SourcesRail } from './components/SourcesRail';
 import { SessionList } from './components/SessionList';
 import { SessionDetail } from './components/SessionDetail';
 import { TabBar, type TabSession } from './components/TabBar';
+import { MemorySearchPanel } from './components/MemorySearchPanel';
+import { MemoryProjectsPanel } from './components/MemoryProjectsPanel';
 import { LightboxProvider } from './components/Lightbox';
 import { FilePreviewProvider } from './components/FilePreview';
 import {
@@ -97,6 +99,8 @@ export function AppShell() {
 
   const [selectedEntryId, setSelectedEntryId] = useState<string | undefined>(undefined);
   const [tweaksOpen, setTweaksOpen] = useState<boolean>(false);
+  const [memorySearchOpen, setMemorySearchOpen] = useState<boolean>(false);
+  const [memoryProjectsOpen, setMemoryProjectsOpen] = useState<boolean>(false);
   const [refreshKey, setRefreshKey] = useState<number>(0);
   const [streamRefreshKey, setStreamRefreshKey] = useState<number>(0);
   const [searchInput, setSearchInput] = useState<string>(searchQ);
@@ -176,6 +180,18 @@ export function AppShell() {
     setSelectedEntryId(undefined);
     void navigate({ to: '/session/$id', params: { id }, search: (prev) => prev });
   }, [navigate]);
+
+  // Cmd/Ctrl+K opens the memory search overlay.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setMemorySearchOpen((v) => !v);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   const setSourceFilter = useCallback((id: string | null) => {
     void navigate({
@@ -402,6 +418,7 @@ export function AppShell() {
         setSearch={setSearchInput}
         onToggleTheme={() => setTw('theme', tw.theme === 'dark' ? 'light' : 'dark')}
         onToggleTweaks={() => setTweaksOpen((v) => !v)}
+        onOpenMemory={() => setMemoryProjectsOpen(true)}
         compact={bp === 'sm'}
       />
 
@@ -554,6 +571,19 @@ export function AppShell() {
           >Reset</button>
         </div>
       </TweaksPanel>
+
+      <MemorySearchPanel
+        theme={tw.theme}
+        open={memorySearchOpen}
+        onClose={() => setMemorySearchOpen(false)}
+        onJumpToSession={(id) => { setActiveTab(HOME_TAB); setActiveId(id); }}
+      />
+
+      <MemoryProjectsPanel
+        theme={tw.theme}
+        open={memoryProjectsOpen}
+        onClose={() => setMemoryProjectsOpen(false)}
+      />
     </div>
     </FilePreviewProvider>
     </LightboxProvider>

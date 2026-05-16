@@ -66,6 +66,14 @@ function initSchema(db: Database.Database): void {
       PRIMARY KEY (sourceId, sessionId, backend)
     );
 
+    CREATE TABLE IF NOT EXISTS wing (
+      slug           TEXT PRIMARY KEY,
+      cwd            TEXT NOT NULL UNIQUE,
+      lastMinedAt    TEXT,
+      status         TEXT NOT NULL DEFAULT 'pending',
+      lastMineError  TEXT
+    );
+
     CREATE TABLE IF NOT EXISTS journal_item (
       id              TEXT PRIMARY KEY,
       kind            TEXT NOT NULL,
@@ -81,6 +89,24 @@ function initSchema(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS journal_item_by_project ON journal_item(projectKey);
     CREATE INDEX IF NOT EXISTS journal_item_by_created ON journal_item(createdAt DESC);
   `);
+
+  // Migrations for wing columns added after initial release. CREATE TABLE
+  // IF NOT EXISTS won't add columns to an existing table, so add them
+  // here. Each ALTER is wrapped in try/catch since SQLite has no
+  // ADD COLUMN IF NOT EXISTS.
+  for (const stmt of [
+    `ALTER TABLE wing ADD COLUMN status TEXT NOT NULL DEFAULT 'pending'`,
+    `ALTER TABLE wing ADD COLUMN lastMineError TEXT`,
+  ]) {
+    try { db.exec(stmt); } catch (err) {
+      const msg = (err as Error).message;
+      if (!/duplicate column/i.test(msg)) throw err;
+    }
+  }
+  // Wings created before the status column existed: if they were
+  // successfully mined (lastMinedAt set), promote them to `ready` so
+  // they don't display as stuck "pending" forever.
+  db.exec(`UPDATE wing SET status = 'ready' WHERE lastMinedAt IS NOT NULL AND status = 'pending'`);
 }
 
 interface SourceRow {
@@ -233,6 +259,48 @@ export const sessionsRepo = {
       .prepare<unknown[], SessionRow>(`SELECT * FROM session WHERE sourceId = ? AND sessionId = ?`)
       .get(sourceId, sessionId);
     return r ? rowToSession(r) : null;
+  },
+};
+
+export type WingStatus = 'pending' | 'mining' | 'ready' | 'failed';
+
+export interface WingRow {
+  slug: string;
+  cwd: string;
+  lastMinedAt: string | null;
+  status: WingStatus;
+  lastMineError: string | null;
+}
+
+export const wingsRepo = {
+  findByCwd(cwd: string): WingRow | null {
+    return getDb()
+      .prepare<unknown[], WingRow>(`SELECT * FROM wing WHERE cwd = ?`)
+      .get(cwd) ?? null;
+  },
+  findBySlug(slug: string): WingRow | null {
+    return getDb()
+      .prepare<unknown[], WingRow>(`SELECT * FROM wing WHERE slug = ?`)
+      .get(slug) ?? null;
+  },
+  insert(slug: string, cwd: string): void {
+    getDb()
+      .prepare(`INSERT INTO wing(slug, cwd, lastMinedAt, status) VALUES (?, ?, NULL, 'pending')`)
+      .run(slug, cwd);
+  },
+  setStatus(slug: string, status: WingStatus, error: string | null = null): void {
+    getDb()
+      .prepare(`UPDATE wing SET status = ?, lastMineError = ? WHERE slug = ?`)
+      .run(status, error, slug);
+  },
+  setLastMinedAt(slug: string, iso: string): void {
+    getDb().prepare(`UPDATE wing SET lastMinedAt = ? WHERE slug = ?`).run(iso, slug);
+  },
+  remove(slug: string): void {
+    getDb().prepare(`DELETE FROM wing WHERE slug = ?`).run(slug);
+  },
+  list(): WingRow[] {
+    return getDb().prepare<unknown[], WingRow>(`SELECT * FROM wing ORDER BY slug`).all();
   },
 };
 

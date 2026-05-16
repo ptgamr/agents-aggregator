@@ -8,10 +8,11 @@ interface TopBarProps {
   setSearch: (s: string) => void;
   onToggleTheme: () => void;
   onToggleTweaks: () => void;
+  onOpenMemory?: () => void;
   compact?: boolean;
 }
 
-export function TopBar({ theme, liveCount, search, setSearch, onToggleTheme, onToggleTweaks, compact = false }: TopBarProps) {
+export function TopBar({ theme, liveCount, search, setSearch, onToggleTheme, onToggleTweaks, onOpenMemory, compact = false }: TopBarProps) {
   const t = themes[theme];
   const btnStyle = {
     background: 'transparent', border: `1px solid ${t.border}`, borderRadius: 6,
@@ -93,6 +94,12 @@ export function TopBar({ theme, liveCount, search, setSearch, onToggleTheme, onT
             <LivePip theme={theme} loud={true} size={6} />
             {liveCount}
           </span>
+        )}
+
+        {onOpenMemory && (
+          <button onClick={onOpenMemory} style={btnStyle} aria-label="MemPalace" title="MemPalace projects">
+            {compact ? '◇' : 'Memory'}
+          </button>
         )}
 
         <button onClick={onToggleTweaks} style={btnStyle} aria-label="Tweaks" title="Tweaks">

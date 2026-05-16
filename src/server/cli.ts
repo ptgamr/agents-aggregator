@@ -23,7 +23,9 @@ program
   .description('Start the API server and serve the UI')
   .option('-p, --port <port>', 'Port to listen on', '3000')
   .option('--no-ui', 'Skip serving the built UI (API only)')
-  .action(async (opts: { port: string; ui: boolean }) => {
+  .option('--mempalace', 'Force-enable MemPalace integration; fail if not installed')
+  .option('--no-mempalace', 'Disable MemPalace integration even if installed')
+  .action(async (opts: { port: string; ui: boolean; mempalace?: boolean }) => {
     const { loadConfig } = await import('./config');
     const { sourcesRepo } = await import('./db');
     const { indexAll } = await import('./indexer');
@@ -44,6 +46,7 @@ program
     log.info({ scanned, sources }, 'initial index complete');
 
     const stopWatcher = startWatcher();
+    const stopMemorySync = await maybeStartMemorySync(opts.mempalace);
 
     if (opts.ui) {
       const uiDir = resolveUiDir();
@@ -57,14 +60,45 @@ program
       }
     });
 
-    const shutdown = () => {
+    const shutdown = async () => {
       log.info('shutting down');
       stopWatcher();
+      stopMemorySync?.();
+      const { stopJobRunner } = await import('./memory/jobs');
+      stopJobRunner();
       process.exit(0);
     };
-    process.on('SIGINT', shutdown);
-    process.on('SIGTERM', shutdown);
+    process.on('SIGINT', () => { void shutdown(); });
+    process.on('SIGTERM', () => { void shutdown(); });
   });
+
+/**
+ * Resolve `--mempalace` / `--no-mempalace` / unset:
+ *   - undefined (no flag): auto — turn on when binary + palace are ready.
+ *   - true (`--mempalace`): explicit on; exit with error when unavailable.
+ *   - false (`--no-mempalace`): explicit off, no detection.
+ */
+async function maybeStartMemorySync(flag: boolean | undefined): Promise<(() => void) | null> {
+  if (flag === false) return null;
+  const { detectMempalace } = await import('./memory/detect');
+  const { startMemorySync } = await import('./memory/sync');
+  const { log } = await import('./logger');
+  const detection = detectMempalace();
+  if (!detection.installed || !detection.initialised) {
+    if (flag === true) {
+      console.error(`--mempalace requested but unavailable: ${detection.unavailableReason}`);
+      process.exit(2);
+    }
+    log.info({ reason: detection.unavailableReason }, 'mempalace integration off');
+    return null;
+  }
+  log.info({ version: detection.version }, 'mempalace integration on');
+  // No auto-backfill on startup. The user opts projects in via the UI
+  // (POST /api/memory/projects) and the job runner takes it from there.
+  // Live `session_updated` events flow through `syncOne` but are gated on
+  // a `ready` wing, so untouched projects produce no work.
+  return startMemorySync();
+}
 
 // --- source --------------------------------------------------------------
 
@@ -166,6 +200,79 @@ program
     for (const s of cfg.sources) sourcesRepo.upsert({ ...s });
     const { scanned, sources } = await indexAll();
     console.log(`Scanned ${scanned} sessions across ${sources} source(s)`);
+  });
+
+// --- memory --------------------------------------------------------------
+
+const memory = program.command('memory').description('MemPalace integration');
+
+memory
+  .command('status')
+  .description('Show MemPalace detection state')
+  .action(async () => {
+    const { detectMempalace } = await import('./memory/detect');
+    const d = detectMempalace();
+    console.log(`installed:     ${d.installed}`);
+    console.log(`version:       ${d.version ?? '-'}`);
+    console.log(`initialised:   ${d.initialised}`);
+    console.log(`palace config: ${d.palaceConfigPath}`);
+    if (d.unavailableReason) {
+      console.log(`unavailable:   ${d.unavailableReason}`);
+    }
+  });
+
+memory
+  .command('rescan')
+  .description('Wipe stage dir, prune palace, and re-render every session from SQLite')
+  .action(async () => {
+    const { detectMempalace } = await import('./memory/detect');
+    const { rescanAll } = await import('./memory/backfill');
+    const { loadConfig } = await import('./config');
+    const { sourcesRepo } = await import('./db');
+    const d = detectMempalace();
+    if (!d.installed || !d.initialised) {
+      console.error(`memory rescan unavailable: ${d.unavailableReason}`);
+      process.exit(2);
+    }
+    const cfg = loadConfig();
+    for (const s of cfg.sources) sourcesRepo.upsert({ ...s });
+    await rescanAll();
+    console.log('rescan complete');
+  });
+
+memory
+  .command('export <composite>')
+  .description('Render a session to MemPalace-flavoured Markdown on stdout. Composite id: <sourceId>:<sessionId>')
+  .action(async (composite: string) => {
+    const { splitSessionId } = await import('../shared/types');
+    const { loadConfig } = await import('./config');
+    const { sourcesRepo, sessionsRepo } = await import('./db');
+    const { parserFor } = await import('./parsers');
+    const { renderSessionMarkdown } = await import('./memory/render');
+
+    const parts = splitSessionId(composite);
+    if (!parts) {
+      console.error(`Invalid id "${composite}". Expected <sourceId>:<sessionId>.`);
+      process.exit(2);
+    }
+
+    const cfg = loadConfig();
+    for (const s of cfg.sources) sourcesRepo.upsert({ ...s });
+
+    const session = sessionsRepo.find(parts.sourceId, parts.sessionId);
+    if (!session) {
+      console.error(`Session not found: ${composite}`);
+      process.exit(2);
+    }
+
+    const parser = parserFor(session.agent);
+    if (!parser) {
+      console.error(`No parser for agent ${session.agent}`);
+      process.exit(2);
+    }
+
+    const entries = await parser.parseEntries(session.filePath);
+    process.stdout.write(renderSessionMarkdown(session, entries));
   });
 
 // -------------------------------------------------------------------------
